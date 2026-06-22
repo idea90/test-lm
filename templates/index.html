@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test LM — ລະບົບສ້າງບົດສອບເສັງ AI</title>
+    <meta name="description" content="ລະບົບສ້າງບົດສອບເສັງອັດສະລິຍະດ້ວຍ AI ພາສາລາວ">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Lao:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Styles -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- ═══ AUTH OVERLAY ═══ -->
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+                <h2>Test LM</h2>
+                <p>ລະບົບສ້າງບົດສອບເສັງອັດສະລິຍະດ້ວຍ AI</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button id="auth-tab-login" class="auth-tab active" type="button">ເຂົ້າລະບົບ</button>
+                <button id="auth-tab-register" class="auth-tab" type="button">ລົງທະບຽນ</button>
+            </div>
+
+            <div class="auth-body">
+                <!-- Login -->
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-username" class="form-label">ຊື່ຜູ້ໃຊ້</label>
+                        <input type="text" id="login-username" class="form-input" required autocomplete="username" placeholder="ໃສ່ຊື່ຜູ້ໃຊ້ຂອງທ່ານ">
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password" class="form-label">ລະຫັດຜ່ານ</label>
+                        <input type="password" id="login-password" class="form-input" required autocomplete="current-password" placeholder="ໃສ່ລະຫັດຜ່ານ">
+                    </div>
+                    <button type="submit" class="btn btn-primary">ເຂົ້າລະບົບ <i class="fa-solid fa-arrow-right"></i></button>
+                </form>
+
+                <!-- Register -->
+                <form id="register-form" class="hidden">
+                    <div class="form-group">
+                        <label for="register-username" class="form-label">ຊື່ຜູ້ໃຊ້</label>
+                        <input type="text" id="register-username" class="form-input" required autocomplete="username" placeholder="ກຳນົດຊື່ຜູ້ໃຊ້">
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password" class="form-label">ລະຫັດຜ່ານ</label>
+                        <input type="password" id="register-password" class="form-input" required autocomplete="new-password" placeholder="ກຳນົດລະຫັດຜ່ານ (ຢ່າງໜ້ອຍ 4 ຕົວ)">
+                    </div>
+                    <button type="submit" class="btn btn-primary">ລົງທະບຽນ <i class="fa-solid fa-user-plus"></i></button>
+                </form>
+
+                <div class="divider"><span>ຫຼື</span></div>
+
+                <button id="guest-login-btn" type="button" class="btn btn-ghost">
+                    <i class="fa-solid fa-user-secret"></i>
+                    ທົດລອງໃຊ້ງານ (Guest)
+                </button>
+                <p class="auth-note">* ໂໝດ Guest ຈະໃຊ້ຖານຂໍ້ມູນຮ່ວມກັນ</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ HEADER ═══ -->
+    <header>
+        <div class="header-left">
+            <button id="toggle-sources-btn" class="btn-icon mobile-only" title="Sources">
+                <i class="fa-solid fa-folder-open"></i>
+            </button>
+            <div class="header-logo"><i class="fa-solid fa-graduation-cap"></i></div>
+            <div>
+                <div class="header-title">Test LM</div>
+                <div class="header-subtitle">AI Exam Generator</div>
+            </div>
+        </div>
+
+        <div class="header-right">
+            <div id="active-test-indicator" class="active-indicator hidden desktop-only">
+                <i class="fa-solid fa-check-circle"></i>
+                <span><strong id="active-test-title">ບົດສອບເສັງ</strong></span>
+            </div>
+
+            <button id="settings-btn" class="btn-icon" title="API Key">
+                <i class="fa-solid fa-key"></i>
+            </button>
+
+            <div id="user-profile-badge" class="header-badge hidden desktop-only">
+                <i class="fa-solid fa-circle-user"></i>
+                <span id="header-username">...</span>
+                <span id="guest-badge" class="badge-sm hidden">GUEST</span>
+            </div>
+
+            <button id="toggle-studio-desktop-btn" class="btn-icon desktop-only" title="Toggle Panel">
+                <i class="fa-solid fa-sliders"></i>
+            </button>
+            <span id="toggle-studio-text" class="hidden">ເຊື່ອງແຖບຈັດການ</span>
+
+            <button id="toggle-studio-btn" class="btn-icon mobile-only" title="Studio">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </button>
+
+            <button id="logout-btn" class="btn btn-sm hidden" style="background:var(--red-soft);color:var(--red);border:1px solid #fecaca;">
+                <i class="fa-solid fa-right-from-bracket"></i> ອອກ
+            </button>
+        </div>
+    </header>
+
+    <!-- ═══ MAIN LAYOUT ═══ -->
+    <main>
+        <div id="drawer-backdrop" class="drawer-backdrop"></div>
+
+        <!-- LEFT: Sources Sidebar -->
+        <aside id="sources-sidebar" class="sources-sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-title">
+                    Sources
+                    <span id="source-count" class="count-badge">0 ໄຟລ໌</span>
+                </div>
+            </div>
+
+            <div id="dropzone" class="dropzone">
+                <input type="file" id="pdf-file-input" accept=".pdf" class="hidden">
+                <div class="dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                <div class="dropzone-text">ອັບໂຫລດ PDF</div>
+                <div class="dropzone-hint">ລາກໄຟລ໌ ຫຼື ຄລິກ</div>
+                <div id="upload-loader" class="upload-loader hidden">
+                    <div class="loading-spinner"></div>
+                    <span style="font-size:10px;color:var(--text-tertiary)">ກຳລັງວິເຄາະ...</span>
+                </div>
+            </div>
+
+            <div class="sources-list custom-scrollbar" id="sources-list">
+                <div id="no-sources" class="empty-state">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <p>ຍັງບໍ່ມີໄຟລ໌. ອັບໂຫລດ PDF ເພື່ອເລີ່ມ.</p>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <strong>ຂັ້ນຕອນ:</strong>
+                <ol>
+                    <li>ອັບໂຫລດ PDF</li>
+                    <li>ເລືອກໄຟລ໌</li>
+                    <li>ສ້າງບົດສອບເສັງ</li>
+                </ol>
+            </div>
+        </aside>
+
+        <!-- CENTER: Chat -->
+        <section id="chat-workspace">
+            <div class="chat-header">
+                <div id="selected-source-tag" class="chat-source-tag">No source selected</div>
+            </div>
+
+            <div id="chat-messages-container" class="chat-messages custom-scrollbar"></div>
+
+            <div class="chat-input-bar">
+                <div class="chat-input-inner">
+                    <input type="text" id="chat-input-field" class="chat-input-field" placeholder="Ask anything about the lesson...">
+                    <button id="send-chat-btn" class="chat-send-btn">
+                        <i class="fa-solid fa-arrow-up" style="font-size:12px"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT: Studio Panel -->
+        <aside id="studio-panel">
+            <div class="studio-tabs">
+                <button class="tab-btn active" data-tab="dashboard">Stats</button>
+                <button class="tab-btn" data-tab="customize">Quiz</button>
+                <button class="tab-btn" data-tab="preview">View</button>
+            </div>
+
+            <div class="studio-content custom-scrollbar" id="workspace-content">
+
+                <!-- ── DASHBOARD TAB ── -->
+                <div id="tab-content-dashboard" class="tab-pane">
+                    <div class="kpi-grid">
+                        <div class="kpi-card">
+                            <div class="kpi-icon blue"><i class="fa-solid fa-file-pdf"></i></div>
+                            <div>
+                                <div class="kpi-label">ເອກະສານ</div>
+                                <div id="dash-total-sources" class="kpi-value">0</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon violet"><i class="fa-solid fa-graduation-cap"></i></div>
+                            <div>
+                                <div class="kpi-label">ຊຸດເສັງ</div>
+                                <div id="dash-total-tests" class="kpi-value">0</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon green"><i class="fa-solid fa-list-check"></i></div>
+                            <div>
+                                <div class="kpi-label">ຄຳຖາມ</div>
+                                <div id="dash-total-questions" class="kpi-value">0</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card">
+                            <div class="kpi-icon rose"><i class="fa-solid fa-database"></i></div>
+                            <div>
+                                <div class="kpi-label">ຂະໜາດ</div>
+                                <div id="dash-total-size" class="kpi-value">0 KB</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title"><i class="fa-solid fa-chart-pie"></i> Difficulty Ratio</div>
+                        <div class="chart-body"><canvas id="difficultyChart"></canvas></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title"><i class="fa-solid fa-chart-bar"></i> Correct Options</div>
+                        <div class="chart-body"><canvas id="optionsChart"></canvas></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title"><i class="fa-solid fa-table"></i> Sources Breakdown</div>
+                        <div style="overflow-x:auto" class="custom-scrollbar">
+                            <table class="data-table" style="min-width:400px">
+                                <thead>
+                                    <tr>
+                                        <th>ຊື່ໄຟລ໌</th>
+                                        <th>ຂະໜາດ</th>
+                                        <th>ຕົວອັກສອນ</th>
+                                        <th>ຊຸດເສັງ</th>
+                                        <th>ຄຳຖາມ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dash-sources-tbody">
+                                    <tr><td colspan="5" style="text-align:center;color:var(--text-tertiary);padding:20px 0">ຍັງບໍ່ມີຂໍ້ມູນ</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title"><i class="fa-solid fa-clock-rotate-left"></i> Recent Tests</div>
+                        <div id="dash-recent-tests">
+                            <div style="text-align:center;padding:20px 0;color:var(--text-tertiary);font-size:12px">ຍັງບໍ່ມີຊຸດຂໍ້ສອບ</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── CUSTOMIZE TAB ── -->
+                <div id="tab-content-customize" class="tab-pane hidden">
+                    <div class="config-card">
+                        <div class="config-title"><i class="fa-solid fa-gears"></i> ຕັ້ງຄ່າ</div>
+
+                        <div class="config-row">
+                            <div class="config-label">
+                                <span>ຈຳນວນຄຳຖາມ</span>
+                                <span id="question-count-display" class="slider-value">10 ຂໍ້</span>
+                            </div>
+                            <input type="range" id="question-count-slider" min="5" max="30" step="5" value="10">
+                            <div class="slider-labels"><span>5</span><span>15</span><span>30</span></div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label"><span>ລະດັບຄວາມຍາກ</span></div>
+                            <div class="diff-group">
+                                <button class="difficulty-btn" data-diff="easy">ງ່າຍ</button>
+                                <button class="difficulty-btn active" data-diff="medium">ປານກາງ</button>
+                                <button class="difficulty-btn" data-diff="hard">ຍາກ</button>
+                            </div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label">
+                                <span>ຈຳນວນຕົວເລືອກ</span>
+                                <span id="options-count-display" class="slider-value">4 ຕົວ</span>
+                            </div>
+                            <input type="range" id="options-count-slider" min="2" max="6" step="1" value="4">
+                            <div class="slider-labels"><span>2</span><span>4</span><span>6</span></div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label"><span>ພາສາຂໍ້ສອບ</span></div>
+                            <select id="language-select" class="form-select">
+                                <option value="lao" selected>ພາສາລາວ</option>
+                                <option value="english">English</option>
+                                <option value="mixed">ປະສົມ (ລາວ + English)</option>
+                            </select>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label"><span>ເວລາ (ນາທີ)</span></div>
+                            <div class="time-input-group">
+                                <input type="number" id="time-limit-input" class="form-input" min="0" max="180" value="0" placeholder="0 = ບໍ່ຈຳກັດ" style="text-align:center">
+                                <span class="time-hint">0 = ບໍ່ຈຳກັດເວລາ</span>
+                            </div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label"><span>ຕົວເລືອກເພີ່ມເຕີມ</span></div>
+                            <div class="toggle-options">
+                                <label class="toggle-option">
+                                    <input type="checkbox" id="shuffle-options-cb">
+                                    <span>ສັບປ່ຽນລຳດັບຕົວເລືອກ</span>
+                                </label>
+                                <label class="toggle-option">
+                                    <input type="checkbox" id="include-answer-key-cb" checked>
+                                    <span>ລວມເຈ້ຍຄຳຕອບ</span>
+                                </label>
+                                <label class="toggle-option">
+                                    <input type="checkbox" id="include-explanation-cb" checked>
+                                    <span>ລວມຄຳອະທິບາຍ</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label"><span>ຮູບແບບ</span></div>
+                            <select id="question-type-select" class="form-select">
+                                <option value="multiple_choice" selected>ປາລະໄນ (Multiple Choice)</option>
+                                <option value="true_false">ຖືກ ຫຼື ຜິດ (True / False)</option>
+                                <option value="short_answer">ຕອບສັ້ນ (Short Answer)</option>
+                            </select>
+                        </div>
+
+                        <div class="config-row">
+                            <div class="config-label"><span>ຄຳສັ່ງເພີ່ມເຕີມ</span></div>
+                            <textarea id="custom-instructions-input" rows="2" class="form-textarea" placeholder="ເນັ້ນໜັກບົດທີ 2, ໃຊ້ຄຳສັບທາງວິຊາການ..."></textarea>
+                        </div>
+
+                        <button id="generate-test-btn" class="generate-btn" disabled>
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            ສ້າງບົດສອບເສັງ
+                        </button>
+                    </div>
+
+                    <div class="section-header">
+                        <div class="section-title">
+                            <i class="fa-solid fa-list-check"></i>
+                            ຄຳຖາມ (<span id="test-questions-count">0</span>)
+                        </div>
+                        <div class="section-desc">ກວດສອບ, ແກ້ໄຂ, ເພີ່ມ ຫຼື ລົບຄຳຖາມ</div>
+                    </div>
+
+                    <div class="action-row">
+                        <button id="toggle-explanations-btn" class="btn btn-sm btn-ghost" style="flex:1">
+                            <i class="fa-solid fa-eye-slash"></i> ເຊື່ອງຄຳອະທິບາຍ
+                        </button>
+                        <button id="add-new-q-btn" class="btn btn-sm hidden" style="flex:1;background:var(--accent);color:white;border-color:var(--accent)">
+                            <i class="fa-solid fa-plus"></i> ເພີ່ມຄຳຖາມ
+                        </button>
+                    </div>
+
+                    <div id="questions-container">
+                        <div class="empty-state" style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border-light);padding:40px 20px">
+                            <i class="fa-solid fa-graduation-cap" style="font-size:28px;color:var(--text-tertiary)"></i>
+                            <p style="margin-top:12px"><strong style="color:var(--text)">ຍັງບໍ່ມີບົດສອບເສັງ</strong><br>ເລືອກ PDF ແລ້ວກົດ "ສ້າງບົດສອບເສັງ"</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── PREVIEW TAB ── -->
+                <div id="tab-content-preview" class="tab-pane hidden">
+                    <div class="preview-settings">
+                        <h4>ປັບແຕ່ງຫົວຂໍ້</h4>
+                        <input type="text" id="school-name-input" class="preview-input" placeholder="ຊື່ໂຮງຮຽນ" value="ໂຮງຮຽນ ມັດທະຍົມສົມບູນ...">
+                        <input type="text" id="subject-name-input" class="preview-input" placeholder="ຊື່ວິຊາ" value="ວິຊາ: ບົດຮຽນທົ່ວໄປ">
+                    </div>
+
+                    <div class="print-sheet printable-area" id="print-sheet">
+                        <div class="exam-header">
+                            <h2 id="preview-school-title">ໂຮງຮຽນ ມັດທະຍົມສົມບູນ...</h2>
+                            <h3 id="preview-exam-subject">ບົດສອບເສັງ ວິຊາ: ບົດຮຽນທົ່ວໄປ</h3>
+                            <div class="student-info">
+                                <div>ຊື່: .................................</div>
+                                <div>ຫ້ອງ: .............</div>
+                                <div>ວັນທີ: ...../...../.....</div>
+                            </div>
+                        </div>
+
+                        <div class="instructions">
+                            ຄຳຊີ້ແຈງ: ເລືອກຄຳຕອບທີ່ຖືກຕ້ອງທີ່ສຸດພຽງຄຳຕອບດຽວ ໂດຍໝາຍ (X) ໃສ່ ກ, ຂ, ຄ ຫຼື ງ.
+                        </div>
+
+                        <div id="print-questions-list"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Export Bar -->
+            <div id="export-bar" class="hidden">
+                <div class="export-title">ພ້ອມສົ່ງອອກ</div>
+                <div class="export-desc">ເລືອກຮູບແບບໄຟລ໌ທີ່ຕ້ອງການ</div>
+                <div class="export-grid">
+                    <button id="export-pdf-btn" class="export-btn pdf">
+                        <i class="fa-solid fa-file-pdf"></i> PDF
+                    </button>
+                    <button id="export-docx-btn" class="export-btn word">
+                        <i class="fa-solid fa-file-word"></i> Word
+                    </button>
+                    <button id="export-png-btn" class="export-btn png">
+                        <i class="fa-solid fa-file-image"></i> PNG
+                    </button>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <!-- ═══ SETTINGS MODAL ═══ -->
+    <dialog id="settings-modal">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-key" style="color:var(--amber)"></i> API Key</h3>
+            <button id="close-settings-btn" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label for="modal-api-key" class="form-label">Google Gemini API Key</label>
+                <input type="password" id="modal-api-key" class="form-input" placeholder="AIzaSy...">
+                <p style="font-size:10px;color:var(--text-tertiary);margin-top:8px;line-height:1.5">
+                    ໃຊ້ Gemini 2.5 Flash. ໃສ່ Key ຂອງທ່ານເອງຖ້າເຊີບເວີບໍ່ໄດ້ຕັ້ງ .env
+                </p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="save-settings-btn" class="btn btn-primary" style="width:auto;padding:10px 24px">ບັນທຶກ</button>
+        </div>
+    </dialog>
+
+    <!-- ═══ EDIT QUESTION MODAL ═══ -->
+    <dialog id="edit-question-modal">
+        <form id="edit-question-form">
+            <input type="hidden" id="edit-q-id">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-pen-to-square" style="color:var(--blue)"></i> ແກ້ໄຂຄຳຖາມ</h3>
+                <button type="button" id="close-edit-q-btn" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="max-height:420px;overflow-y:auto" class="custom-scrollbar">
+                <div class="form-group">
+                    <label for="edit-q-text" class="form-label">ຫົວຂໍ້ຄຳຖາມ</label>
+                    <textarea id="edit-q-text" rows="2" required class="form-textarea" style="background:var(--surface)"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                    <div class="form-group">
+                        <label for="edit-opt-a" class="form-label">ຕົວເລືອກ ກ</label>
+                        <input type="text" id="edit-opt-a" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-opt-b" class="form-label">ຕົວເລືອກ ຂ</label>
+                        <input type="text" id="edit-opt-b" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-opt-c" class="form-label">ຕົວເລືອກ ຄ</label>
+                        <input type="text" id="edit-opt-c" required class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-opt-d" class="form-label">ຕົວເລືອກ ງ</label>
+                        <input type="text" id="edit-opt-d" required class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="edit-q-correct" class="form-label">ຄຳຕອບທີ່ຖືກ</label>
+                    <select id="edit-q-correct" class="form-select">
+                        <option value="A">ກ (A)</option>
+                        <option value="B">ຂ (B)</option>
+                        <option value="C">ຄ (C)</option>
+                        <option value="D">ງ (D)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-q-explanation" class="form-label">ຄຳອະທິບາຍ</label>
+                    <textarea id="edit-q-explanation" rows="2" class="form-textarea" style="background:var(--surface)" placeholder="ອະທິບາຍວ່າເປັນຫຍັງຄຳຕອບນີ້ຖືກ..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancel-edit-q-btn" class="btn btn-sm btn-ghost" style="width:auto">ຍົກເລີກ</button>
+                <button type="submit" class="btn btn-sm" style="width:auto;background:var(--accent);color:white;border-color:var(--accent)">ບັນທຶກ</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script src="/static/main.js"></script>
+</body>
+</html>
