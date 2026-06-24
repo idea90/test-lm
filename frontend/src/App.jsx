@@ -196,10 +196,11 @@ export default function App() {
   const [selSrcId, setSelSrcId] = useState(null);
   const [stats, setStats] = useState(null);
   const [activeTest, setActiveTest] = useState(null);
+  const [systemPrompts, setSystemPrompts] = useState(['default']);
 
   const [cfg, setCfg] = useState({
     numQ: 10, diff: 'medium', type: 'multiple_choice',
-    lang: 'lao', custom: '', shuffle: false, model: 'gemini-2.5-flash'
+    lang: 'lao', custom: '', shuffle: false, model: 'gemini-2.5-flash', systemPrompt: 'default'
   });
   const [dottedLines, setDottedLines] = useState(3);
   const [previewSubjInstructions, setPreviewSubjInstructions] = useState('ຈົ່ງຕອບຄຳຖາມລຸ່ມນີ້ໃສ່ບ່ອນວ່າງ:');
@@ -257,7 +258,7 @@ export default function App() {
       const d = await r.json();
       if (r.ok && d.logged_in) {
         setUser({ username: d.username, isGuest: d.is_guest, profile_pic: d.profile_pic });
-        loadSources(); loadStats(); restoreLastTest();
+        loadSources(); loadStats(); restoreLastTest(); loadSystemPrompts();
       }
     } catch (e) { console.error(e); }
   };
@@ -271,7 +272,7 @@ export default function App() {
       if (r.ok) {
         setUser({ username: d.username, isGuest: d.is_guest || false, profile_pic: d.profile_pic });
         setAuthForm({ username: '', password: '' });
-        loadSources(); loadStats(); restoreLastTest();
+        loadSources(); loadStats(); restoreLastTest(); loadSystemPrompts();
         show(authMode === 'login' ? 'ເຂົ້າລະບົບສຳເລັດ' : 'ລົງທະບຽນສຳເລັດ');
       } else showAlert(d.error);
     } catch { showAlert('ເກີດຂໍ້ຜິດພາດ'); }
@@ -281,7 +282,7 @@ export default function App() {
     try {
       const r = await api.post('/api/auth/guest', {});
       const d = await r.json();
-      if (r.ok) { setUser({ username: d.username, isGuest: true, profile_pic: d.profile_pic }); loadSources(); loadStats(); show('Guest mode'); }
+      if (r.ok) { setUser({ username: d.username, isGuest: true, profile_pic: d.profile_pic }); loadSources(); loadStats(); loadSystemPrompts(); show('Guest mode'); }
     } catch { showAlert('ເກີດຂໍ້ຜິດພາດ'); }
   };
 
@@ -294,6 +295,7 @@ export default function App() {
   // ─── Data ───
   const loadSources = async () => { try { const r = await api.get('/api/sources'); if (r.ok) setSources(await r.json()); } catch {} };
   const loadStats = async () => { try { const r = await api.get('/api/dashboard/stats'); if (r.ok) setStats(await r.json()); } catch {} };
+  const loadSystemPrompts = async () => { try { const r = await api.get('/api/system-prompts'); if (r.ok) setSystemPrompts(await r.json()); } catch {} };
 
   const loadTest = async (testId) => {
     try {
@@ -399,6 +401,7 @@ export default function App() {
         question_type: cfg.type, custom_instructions: cfg.custom,
         language: cfg.lang, shuffle_options: cfg.shuffle, 
         model: cfg.model || 'gemini-2.5-flash',
+        system_prompt: cfg.systemPrompt || 'default',
         api_keys: { gemini: key, openai: openai_key, anthropic: anthropic_key }
       });
       const d = await r.json();
@@ -951,6 +954,14 @@ export default function App() {
               <div className="config-field">
                 <div className="config-field-label">ໂມເດວ AI (Model)</div>
                 <ModelSelect value={cfg.model || 'gemini-2.5-flash'} onChange={val => setCfg(p => ({ ...p, model: val }))} />
+              </div>
+              <div className="config-field">
+                <div className="config-field-label">System Prompt</div>
+                <select className="md-select" value={cfg.systemPrompt || 'default'} onChange={e => setCfg(p => ({ ...p, systemPrompt: e.target.value }))}>
+                  {systemPrompts.map(sp => (
+                    <option key={sp} value={sp}>{sp === 'default' ? 'ມາດຕະຖານ (Default)' : sp}</option>
+                  ))}
+                </select>
               </div>
               <div className="config-field">
                 <div className="config-field-label"><span>ຈຳນວນ</span><span className="config-field-badge">{cfg.numQ} ຂໍ້</span></div>
