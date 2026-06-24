@@ -8,7 +8,8 @@ from functools import wraps
 
 # Import our custom helper modules
 import database
-import gemini_helper
+import llm_helper
+import gemini_helper # Keep around for backward compatibility if needed
 
 # Load environment variables
 load_dotenv()
@@ -149,6 +150,32 @@ def extract_text_from_pdf(file_stream):
         print(f"Error reading PDF: {e}")
         return None
 
+def extract_text_from_docx(file_stream):
+    try:
+        from docx import Document
+        doc = Document(file_stream)
+        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+        return text.strip()
+    except Exception as e:
+        print(f"Error reading DOCX: {e}")
+        return None
+
+def extract_text_from_image(file_stream):
+    try:
+        import gemini_helper
+        from PIL import Image
+        img = Image.open(file_stream)
+        
+        client = gemini_helper.get_client()
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=["Please extract and transcribe all the text from this image exactly as it appears. If there is no text, describe the image.", img]
+        )
+        return response.text
+    except Exception as e:
+        print(f"Error reading Image: {e}")
+        return None
+
 # Serve Frontend Home Page
 @app.route('/')
 def index():
@@ -184,8 +211,10 @@ def upload_source():
     if file.filename == '':
         return jsonify({"error": "ຊື່ໄຟລ໌ບໍ່ຖືກຕ້ອງ"}), 400
         
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({"error": "ຮອງຮັບສະເພາະໄຟລ໌ PDF ເທົ່ານັ້ນ"}), 400
+    filename_lower = file.filename.lower()
+    allowed_extensions = ('.pdf', '.docx', '.jpg', '.jpeg', '.png')
+    if not filename_lower.endswith(allowed_extensions):
+        return jsonify({"error": "ຮອງຮັບສະເພາະໄຟລ໌ PDF, DOCX ແລະ ຮູບພາບເທົ່ານັ້ນ"}), 400
         
     try:
         # Read the file contents into memory stream to parse
@@ -193,9 +222,16 @@ def upload_source():
         file_size = len(file_bytes)
         file_stream = io.BytesIO(file_bytes)
         
-        extracted_text = extract_text_from_pdf(file_stream)
+        extracted_text = None
+        if filename_lower.endswith('.pdf'):
+            extracted_text = extract_text_from_pdf(file_stream)
+        elif filename_lower.endswith('.docx'):
+            extracted_text = extract_text_from_docx(file_stream)
+        else:
+            extracted_text = extract_text_from_image(file_stream)
+            
         if not extracted_text:
-            return jsonify({"error": "ບໍ່ສາມາດອ່ານຂໍ້ຄວາມຈາກ PDF ໄດ້ ຫຼື ໄຟລ໌ຫວ່າງເປົ່າ"}), 400
+            return jsonify({"error": "ບໍ່ສາມາດອ່ານຂໍ້ຄວາມຈາກໄຟລ໌ໄດ້ ຫຼື ໄຟລ໌ຫວ່າງເປົ່າ"}), 400
             
         source_id = database.add_source(file.filename, file_size, extracted_text, session['user_id'])
         
@@ -271,6 +307,20 @@ def delete_test(test_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/tests/<int:test_id>/rich_text', methods=['PUT'])
+@login_required
+def update_test_rich_text(test_id):
+    data = request.json
+    if not data or 'rich_text_content' not in data:
+        return jsonify({"error": "ບໍ່ມີເນື້ອຫາສົ່ງມາ"}), 400
+    try:
+        success = database.update_test_rich_text(test_id, session['user_id'], data['rich_text_content'])
+        if not success:
+            return jsonify({"error": "ບໍ່ພົບການສອບເສັງ ຫຼື ບໍ່ມີສິດ"}), 404
+        return jsonify({"message": "ບັນທຶກເອກະສານສຳເລັດ"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/tests/generate', methods=['POST'])
 @login_required
 def generate_test():
@@ -287,7 +337,11 @@ def generate_test():
     language = data.get('language', 'lao')
     time_limit = int(data.get('time_limit', 0))
     shuffle_options = data.get('shuffle_options', False)
-    api_key = data.get('api_key') or None
+    
+    model = data.get('model', 'gemini-2.5-flash')
+    api_keys = data.get('api_keys', {})
+    if data.get('api_key'):
+        api_keys['gemini'] = data.get('api_key')
     
     try:
         source = database.get_source(source_id, session['user_id'])
@@ -298,8 +352,9 @@ def generate_test():
         if user_stats['total_tokens_used'] >= user_stats['token_limit']:
             return jsonify({"error": "ໂຄຕ້າການນຳໃຊ້ AI ຂອງທ່ານໝົດແລ້ວ (Limit Reached)"}), 429
             
-        # Generate questions via Gemini
-        gemini_response, token_count = gemini_helper.generate_test_questions(
+        # Generate questions via LLM
+        gemini_response, token_count = llm_helper.generate_test_questions(
+            model_name=model,
             context_text=source['text_content'],
             num_questions=num_questions,
             difficulty_lao=difficulty,
@@ -307,7 +362,7 @@ def generate_test():
             custom_instructions=custom_instructions,
             num_options=num_options,
             language=language,
-            api_key=api_key
+            api_keys=api_keys
         )
         database.increment_token_usage(session['user_id'], token_count)
         
@@ -426,7 +481,11 @@ def chat_with_source():
     source_id = data['source_id']
     new_message = data['message']
     chat_history = data.get('history', [])
-    api_key = data.get('api_key') or None
+    
+    model = data.get('model', 'gemini-2.5-flash')
+    api_keys = data.get('api_keys', {})
+    if data.get('api_key'):
+        api_keys['gemini'] = data.get('api_key')
     
     try:
         source = database.get_source(source_id, session['user_id'])
@@ -437,11 +496,12 @@ def chat_with_source():
         if user_stats['total_tokens_used'] >= user_stats['token_limit']:
             return jsonify({"error": "ໂຄຕ້າການນຳໃຊ້ AI ຂອງທ່ານໝົດແລ້ວ (Limit Reached)"}), 429
             
-        response_text, token_count = gemini_helper.generate_chat_response(
+        response_text, token_count = llm_helper.generate_chat_response(
+            model_name=model,
             chat_history=chat_history,
             new_message=new_message,
             context_text=source['text_content'],
-            api_key=api_key
+            api_keys=api_keys
         )
         database.increment_token_usage(session['user_id'], token_count)
         

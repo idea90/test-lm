@@ -48,6 +48,7 @@ def init_db():
             difficulty TEXT NOT NULL,
             num_questions INTEGER NOT NULL,
             source_id INTEGER,
+            rich_text_content TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             user_id INTEGER,
             FOREIGN KEY(source_id) REFERENCES sources(id) ON DELETE SET NULL,
@@ -82,6 +83,8 @@ def init_db():
     columns = [row[1] for row in cursor.fetchall()]
     if 'user_id' not in columns:
         cursor.execute("ALTER TABLE tests ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE")
+    if 'rich_text_content' not in columns:
+        cursor.execute("ALTER TABLE tests ADD COLUMN rich_text_content TEXT")
         
     # Migrate users table if needed
     cursor.execute("PRAGMA table_info(users)")
