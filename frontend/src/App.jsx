@@ -210,6 +210,12 @@ export default function App() {
   const [editModal, setEditModal] = useState(null);
   const [configOpen, setConfigOpen] = useState(false);
 
+  const [rangeDialogOpen, setRangeDialogOpen] = useState(false);
+  const [rangeDialogFile, setRangeDialogFile] = useState(null);
+  const [rangeDialogPages, setRangeDialogPages] = useState(0);
+  const [rangeDialogStart, setRangeDialogStart] = useState(1);
+  const [rangeDialogEnd, setRangeDialogEnd] = useState(1);
+
   const [previewSchool, setPreviewSchool] = useState('ໂຮງຮຽນ ມັດທະຍົມສົມບູນ...');
   const [previewSubject, setPreviewSubject] = useState('ວິຊາ: ບົດຮຽນທົ່ວໄປ');
   const [previewMotto, setPreviewMotto] = useState('ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ\nສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນາຖາວອນ\n------000-------');
@@ -306,16 +312,67 @@ export default function App() {
   };
 
   const handleUpload = async (file) => {
-    if (!file?.name.toLowerCase().endsWith('.pdf')) { showAlert('PDF ເທົ່ານັ້ນ'); return; }
+    if (!file) return;
+    const nameLower = file.name.toLowerCase();
+    const isPdf = nameLower.endsWith('.pdf');
+    const isDocx = nameLower.endsWith('.docx');
+    const isImage = nameLower.endsWith('.jpg') || nameLower.endsWith('.jpeg') || nameLower.endsWith('.png');
+
+    if (!isPdf && !isDocx && !isImage) {
+      showAlert('ຮອງຮັບສະເພາະໄຟລ໌ PDF, DOCX ແລະ ຮູບພາບເທົ່ານັ້ນ');
+      return;
+    }
+
+    if (isPdf) {
+      setUploading(true);
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const r = await api.postForm('/api/sources/upload/info', fd);
+        const d = await r.json();
+        if (r.ok && d.is_pdf) {
+          setRangeDialogFile(file);
+          setRangeDialogPages(d.total_pages);
+          setRangeDialogStart(1);
+          setRangeDialogEnd(d.total_pages);
+          setRangeDialogOpen(true);
+        } else {
+          showAlert(d.error || 'ບໍ່ສາມາດອ່ານຂໍ້ມູນ PDF ໄດ້');
+        }
+      } catch (err) {
+        showAlert('ເກີດຂໍ້ຜິດພາດໃນການກວດສອບ PDF');
+      } finally {
+        setUploading(false);
+      }
+    } else {
+      await performUpload(file);
+    }
+  };
+
+  const performUpload = async (file, pageStart = null, pageEnd = null) => {
     setUploading(true);
-    const fd = new FormData(); fd.append('file', file);
+    const fd = new FormData();
+    fd.append('file', file);
+    if (pageStart !== null) fd.append('page_start', pageStart);
+    if (pageEnd !== null) fd.append('page_end', pageEnd);
+
     try {
       const r = await api.postForm('/api/sources/upload', fd);
       const d = await r.json();
-      if (r.ok) { show('ອັບໂຫລດສຳເລັດ'); await loadSources(); setSelSrcId(d.id); loadStats(); }
-      else showAlert(d.error);
-    } catch { showAlert('Error'); }
-    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+      if (r.ok) {
+        show('ອັບໂຫລດສຳເລັດ');
+        await loadSources();
+        setSelSrcId(d.id);
+        loadStats();
+      } else {
+        showAlert(d.error);
+      }
+    } catch {
+      showAlert('ເກີດຂໍ້ຜິດພາດໃນການອັບໂຫລດ');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   const deleteSource = (id) => {
@@ -512,10 +569,10 @@ export default function App() {
           onDragLeave={e => e.currentTarget.classList.remove('drag')}
           onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('drag'); if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]); }}
         >
-          <input ref={fileRef} type="file" accept=".pdf" hidden onChange={e => e.target.files[0] && handleUpload(e.target.files[0])} />
+          <input ref={fileRef} type="file" accept=".pdf,.docx,.jpg,.jpeg,.png" hidden onChange={e => e.target.files[0] && handleUpload(e.target.files[0])} />
           {uploading ? <div className="md-spinner" /> : <>
             <I name="upload" size={16} />
-            <span>ອັບໂຫລດ PDF</span>
+            <span>ອັບໂຫລດໄຟລ໌ບົດຮຽນ</span>
           </>}
         </div>
 
@@ -526,7 +583,7 @@ export default function App() {
           {sources.length === 0 && (
             <div className="sb-empty">
               <I name="folder" size={24} />
-              <p>ອັບໂຫລດ PDF ເພື່ອເລີ່ມ</p>
+              <p>ອັບໂຫລດໄຟລ໌ບົດຮຽນເພື່ອເລີ່ມ</p>
             </div>
           )}
           {sources.map(s => (
@@ -788,7 +845,7 @@ export default function App() {
                 <p>{selSrc ? `ແຫຼ່ງ: "${selSrc.filename}" — ກົດ "ສ້າງບົດສອບເສັງ" ທາງເທິງ` : 'ເລືອກໄຟລ໌ ທາງຊ້າຍ ແລ້ວກົດ "ສ້າງບົດສອບເສັງ"'}</p>
                 {!selSrc && (
                   <button className="md-btn-tonal" style={{ width: 'auto', padding: '10px 24px', marginTop: 20 }} onClick={() => fileRef.current?.click()}>
-                    <I name="upload" size={16} /> ອັບໂຫລດ PDF
+                    <I name="upload" size={16} /> ອັບໂຫລດໄຟລ໌ບົດຮຽນ
                   </button>
                 )}
               </div>
@@ -946,6 +1003,65 @@ export default function App() {
                 const d = { question_text: editModal.question_text, option_a: editModal.option_a, option_b: editModal.option_b, option_c: editModal.option_c, option_d: editModal.option_d, correct_option: editModal.correct_option, explanation: editModal.explanation };
                 editModal.mode === 'add' ? addQ(d) : updateQ(editModal.id, d);
               }}>ບັນທຶກ</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ PAGE RANGE DIALOG ═══ */}
+      {rangeDialogOpen && (
+        <div className="dialog-scrim" onClick={() => setRangeDialogOpen(false)}>
+          <div className="dialog-card animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="dialog-header">ເລືອກຊ່ວງໜ້າ PDF</div>
+            <div className="dialog-body" style={{ padding: '0 24px 20px', fontSize: 14, color: 'var(--md-on-surface-variant)', lineHeight: 1.6 }}>
+              <p style={{ marginBottom: 16 }}>
+                ໄຟລ໌ມີທັງໝົດ <strong style={{ color: 'var(--md-primary)' }}>{rangeDialogPages}</strong> ໜ້າ. ເລືອກຊ່ວງໜ້າທີ່ຕ້ອງການດຶງຂໍ້ມູນ:
+              </p>
+              
+              <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+                <div className="md-field" style={{ flex: 1, marginBottom: 0 }}>
+                  <label>ເລີ່ມຕົ້ນ (ໜ້າ)</label>
+                  <input
+                    className="md-input"
+                    type="number"
+                    min="1"
+                    max={rangeDialogPages}
+                    value={rangeDialogStart}
+                    onChange={e => {
+                      const val = Math.max(1, Math.min(rangeDialogPages, parseInt(e.target.value) || 1));
+                      setRangeDialogStart(val);
+                      if (val > rangeDialogEnd) setRangeDialogEnd(val);
+                    }}
+                  />
+                </div>
+                <div className="md-field" style={{ flex: 1, marginBottom: 0 }}>
+                  <label>ສິ້ນສຸດ (ໜ້າ)</label>
+                  <input
+                    className="md-input"
+                    type="number"
+                    min={rangeDialogStart}
+                    max={rangeDialogPages}
+                    value={rangeDialogEnd}
+                    onChange={e => {
+                      const val = Math.max(rangeDialogStart, Math.min(rangeDialogPages, parseInt(e.target.value) || rangeDialogPages));
+                      setRangeDialogEnd(val);
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="dialog-actions" style={{ padding: '8px 24px 24px' }}>
+              <button className="md-btn-text" onClick={() => setRangeDialogOpen(false)}>ຍົກເລີກ</button>
+              <button 
+                className="md-btn-filled" 
+                style={{ width: 'auto', padding: '10px 24px', borderRadius: 'var(--shape-full)' }}
+                onClick={() => {
+                  setRangeDialogOpen(false);
+                  performUpload(rangeDialogFile, rangeDialogStart, rangeDialogEnd);
+                }}
+              >
+                ຕົກລົງ
+              </button>
             </div>
           </div>
         </div>

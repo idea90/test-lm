@@ -5,6 +5,12 @@ import io
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+import pytesseract
+from pdf2image import convert_from_bytes
+
+# Configure Tesseract and Poppler paths for Windows
+POPPLER_PATH = r"C:\Users\idea\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # Import our custom helper modules
 import database
@@ -137,14 +143,40 @@ def get_current_user():
     return jsonify({"logged_in": False})
 
 # Helper function to extract text from PDF
-def extract_text_from_pdf(file_stream):
+def extract_text_from_pdf(file_stream, page_start=1, page_end=None):
     try:
         reader = pypdf.PdfReader(file_stream)
+        total_pages = len(reader.pages)
+        
+        start_idx = max(0, (page_start or 1) - 1)
+        end_idx = min(total_pages, page_end if page_end is not None else total_pages)
+        
+        # Get raw bytes of the file stream for pdf2image if OCR fallback is needed
+        file_stream.seek(0)
+        pdf_bytes = file_stream.read()
+        
         text = ""
-        for i, page in enumerate(reader.pages):
+        for i in range(start_idx, end_idx):
+            page = reader.pages[i]
             page_text = page.extract_text()
+            
+            # If PyPDF extracted virtually no text, run OCR fallback for this page
+            if not page_text or len(page_text.strip()) < 15:
+                page_num = i + 1
+                print(f"PyPDF extracted minimal text for page {page_num}. Trying Tesseract OCR fallback...")
+                try:
+                    images = convert_from_bytes(pdf_bytes, first_page=page_num, last_page=page_num, poppler_path=POPPLER_PATH)
+                    if images:
+                        ocr_text = pytesseract.image_to_string(images[0], lang='lao+eng')
+                        if ocr_text and len(ocr_text.strip()) > 5:
+                            page_text = ocr_text
+                            print(f"Successfully OCR'd page {page_num} using Tesseract.")
+                except Exception as ocr_err:
+                    print(f"OCR failed for page {page_num}: {ocr_err}")
+            
             if page_text:
                 text += page_text + "\n"
+                
         return text.strip()
     except Exception as e:
         print(f"Error reading PDF: {e}")
@@ -162,10 +194,25 @@ def extract_text_from_docx(file_stream):
 
 def extract_text_from_image(file_stream):
     try:
-        import gemini_helper
         from PIL import Image
+        file_stream.seek(0)
         img = Image.open(file_stream)
         
+        # Try Tesseract OCR first (offline, fast, free)
+        try:
+            print("Extracting text from image using Tesseract OCR...")
+            ocr_text = pytesseract.image_to_string(img, lang='lao+eng')
+            if ocr_text and len(ocr_text.strip()) > 15:
+                print("Image text extracted successfully using Tesseract OCR.")
+                return ocr_text.strip()
+        except Exception as ocr_err:
+            print(f"Tesseract OCR failed on image: {ocr_err}")
+            
+        # Fall back to Gemini Vision
+        print("Tesseract OCR yielded insufficient text, falling back to Gemini Vision...")
+        import gemini_helper
+        file_stream.seek(0)
+        img = Image.open(file_stream)
         client = gemini_helper.get_client()
         response = client.models.generate_content(
             model='gemini-2.5-flash',
@@ -201,6 +248,30 @@ def get_sources():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/sources/upload/info', methods=['POST'])
+@login_required
+def upload_source_info():
+    if 'file' not in request.files:
+        return jsonify({"error": "ບໍ່ພົບໄຟລ໌ທີ່ອັບໂຫລດ"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "ຊື່ໄຟລ໌ບໍ່ຖືກຕ້ອງ"}), 400
+        
+    filename_lower = file.filename.lower()
+    if not filename_lower.endswith('.pdf'):
+        return jsonify({"total_pages": 0, "is_pdf": False})
+        
+    try:
+        file_bytes = file.read()
+        file_stream = io.BytesIO(file_bytes)
+        reader = pypdf.PdfReader(file_stream)
+        total_pages = len(reader.pages)
+        return jsonify({"total_pages": total_pages, "is_pdf": True})
+    except Exception as e:
+        print(f"Error reading PDF info: {e}")
+        return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການອ່ານໄຟລ໌: {str(e)}"}), 500
+
 @app.route('/api/sources/upload', methods=['POST'])
 @login_required
 def upload_source():
@@ -222,9 +293,21 @@ def upload_source():
         file_size = len(file_bytes)
         file_stream = io.BytesIO(file_bytes)
         
+        page_start = request.form.get('page_start')
+        page_end = request.form.get('page_end')
+        if page_start is not None and page_start != '':
+            page_start = int(page_start)
+        else:
+            page_start = None
+            
+        if page_end is not None and page_end != '':
+            page_end = int(page_end)
+        else:
+            page_end = None
+        
         extracted_text = None
         if filename_lower.endswith('.pdf'):
-            extracted_text = extract_text_from_pdf(file_stream)
+            extracted_text = extract_text_from_pdf(file_stream, page_start=page_start, page_end=page_end)
         elif filename_lower.endswith('.docx'):
             extracted_text = extract_text_from_docx(file_stream)
         else:
