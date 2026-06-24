@@ -4,10 +4,10 @@ import os
 print("=== Verifying Test LM Application ===")
 
 try:
-    import flask
-    print("[OK] Flask package imported successfully.")
+    import fastapi
+    print("[OK] FastAPI package imported successfully.")
 except ImportError:
-    print("[FAIL] Flask package import FAILED.")
+    print("[FAIL] FastAPI package import FAILED.")
     sys.exit(1)
 
 try:

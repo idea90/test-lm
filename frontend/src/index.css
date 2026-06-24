@@ -101,6 +101,60 @@
   --md-warning-container: #5C4200;
 }
 
+/* ─── THEMES ─── */
+[data-color="blue"] {
+  --md-primary: #0061A4;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #D1E4FF;
+  --md-on-primary-container: #001D36;
+}
+[data-theme="dark"][data-color="blue"] {
+  --md-primary: #9ECAFF;
+  --md-on-primary: #003258;
+  --md-primary-container: #00497D;
+  --md-on-primary-container: #D1E4FF;
+}
+
+[data-color="green"] {
+  --md-primary: #2E6B27;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #AEEFB0;
+  --md-on-primary-container: #002200;
+}
+[data-theme="dark"][data-color="green"] {
+  --md-primary: #93D596;
+  --md-on-primary: #003901;
+  --md-primary-container: #12520E;
+  --md-on-primary-container: #AEEFB0;
+}
+
+[data-color="rose"] {
+  --md-primary: #9B4051;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #FFD9DE;
+  --md-on-primary-container: #3F0013;
+}
+[data-theme="dark"][data-color="rose"] {
+  --md-primary: #FFB2BE;
+  --md-on-primary: #5F1125;
+  --md-primary-container: #7D293A;
+  --md-on-primary-container: #FFD9DE;
+}
+
+[data-color="orange"] {
+  --md-primary: #8C5000;
+  --md-on-primary: #FFFFFF;
+  --md-primary-container: #FFDCBE;
+  --md-on-primary-container: #2C1600;
+}
+[data-theme="dark"][data-color="orange"] {
+  --md-primary: #FFB870;
+  --md-on-primary: #4A2800;
+  --md-primary-container: #6A3B00;
+  --md-on-primary-container: #FFDCBE;
+}
+
+
 [data-theme="dark"] .exam-paper {
   background: #1D1B20;
   color: #E6E0E9;
@@ -132,6 +186,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
+  transition: background-color var(--motion-std), color var(--motion-std);
   font-family: var(--font);
   background: var(--md-surface-container);
   color: var(--md-on-surface);
@@ -333,16 +388,24 @@ body {
   position: absolute;
   right: 10px;
   opacity: 0;
-  background: none;
+  background: transparent;
   border: none;
-  cursor: pointer;
   color: var(--md-on-surface-variant);
-  width: 24px; height: 24px;
+  width: 36px; height: 36px;
   border-radius: var(--shape-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--motion-std);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background var(--motion-std), color var(--motion-std);
+}
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--md-on-surface-variant);
+  width: 36px; height: 36px;
+  border-radius: var(--shape-full);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background var(--motion-std), color var(--motion-std);
 }
 .sb-item:hover .sb-item-del { opacity: 1; }
 .sb-item-del:hover { background: var(--md-error-container); color: var(--md-error); }

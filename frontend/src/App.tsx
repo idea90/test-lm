@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './index.css';
 
 // ═══ Icons ═══
-const I = ({ name, size = 20 }) => {
-  const d = {
+const I = ({ name, size = 20, style }: { name: string; size?: number; style?: React.CSSProperties }) => {
+  const d: Record<string, string> = {
     zap: 'M13 2L3 14h7l-1 8 10-12h-7l1-8z',
     upload: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
     file: 'M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2zM14 2v6h6',
@@ -28,7 +28,7 @@ const I = ({ name, size = 20 }) => {
     warning: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
   };
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <path d={d[name] || ''} />
     </svg>
   );
@@ -58,16 +58,24 @@ const api = {
   del: (u) => fetch(u, { method: 'DELETE' }),
 };
 
-const LAO = { A: 'ກ', B: 'ຂ', C: 'ຄ', D: 'ງ' };
+const LAO: Record<string, string> = { A: 'ກ', B: 'ຂ', C: 'ຄ', D: 'ງ' };
 
 const MODELS = [
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'gemini', desc: 'ສະຫຼາດທີ່ສຸດ ຂອງ Google', badge: 'Gemini' },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', desc: 'ໄວ ແລະ ປະຢັດ (ແນະນຳ)', badge: 'Gemini' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', desc: 'ປະສິດທິພາບສູງ & ວຽກຊັບຊ້ອນ', badge: 'Gemini' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', desc: 'ໄວ ແລະ ຂະໜາດນ້ອຍ ຂອງ OpenAI', badge: 'OpenAI' },
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', desc: 'ໂມເດວອະເນກປະສົງ ຂອງ OpenAI', badge: 'OpenAI' },
-  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'anthropic', desc: 'ສະຫຼາດ ແລະ ຕອບສະໜອງໄວ', badge: 'Claude' },
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'anthropic', desc: 'ຄິດວິເຄາະດີເລີດ ຂອງ Anthropic', badge: 'Claude' },
+  // ─── Google Gemini ───
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', desc: '\u0ec4\u0ea7 \u0ec1\u0ea5\u0eb0 \u0e9b\u0eb0\u0ea2\u0eb1\u0e94 (\u0ec1\u0e99\u0eb0\u0e99\u0eb3)', badge: 'Gemini' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', desc: '\u0e9b\u0eb0\u0eaa\u0eb4\u0e94\u0e97\u0eb4\u0e9e\u0eb2\u0e9a\u0eaa\u0eb9\u0e87 & \u0ea7\u0ebd\u0e81\u0e8a\u0eb1\u0e9a\u0e8a\u0ec9\u0ead\u0e99', badge: 'Gemini' },
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', provider: 'gemini', desc: '\u0ec3\u0eab\u0ea1\u0ec8\u0ea5\u0ec8\u0eb2\u0eaa\u0eb8\u0e94! \u0eaa\u0eb0\u0eab\u0ebc\u0eb2\u0e94 \u0ec1\u0ea5\u0eb0 \u0e9c\u0eb0\u0ea5\u0e97\u0ee4\u0e94\u0e94\u0eb5\u0ec0\u0ea5\u0eb5\u0e94', badge: 'Gemini' },
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'gemini', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0ec4\u0ea7 \u0e9e\u0ead\u0ec3\u0e88 \u0eaa\u0eb3\u0ea5\u0eb1\u0e9a\u0e87\u0eb2\u0e99\u0ec3\u0eab\u0e8d\u0ec8', badge: 'Gemini' },
+  // ─── OpenAI ───
+  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', desc: '\u0ec2\u0ea1\u0ec0\u0e94\u0ea7\u0ead\u0eb0\u0ec0\u0e99\u0e81\u0e9b\u0eb0\u0eaa\u0ebb\u0e87 \u0e82\u0ead\u0e87 OpenAI', badge: 'OpenAI' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', desc: '\u0ec4\u0ea7 \u0ec1\u0ea5\u0eb0 \u0e82\u0eb0\u0edc\u0eb2\u0e94\u0e99\u0ec9\u0ead\u0e8d \u0e82\u0ead\u0e87 OpenAI', badge: 'OpenAI' },
+  { id: 'gpt-5', name: 'GPT-5', provider: 'openai', desc: '\u0ec3\u0eab\u0ea1\u0ec8\u0ea5\u0ec8\u0eb2\u0eaa\u0eb8\u0e94! \u0ec1\u0e81\u0ec9\u0e9b\u0eb1\u0e8d\u0eab\u0eb2\u0ec4\u0e94\u0ec9\u0ec0\u0e81\u0ec8\u0e87\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94', badge: 'OpenAI' },
+  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0e81\u0eb2\u0e99\u0e84\u0eb4\u0e94\u0e9e\u0edd\u0e99\u0e97\u0eb2\u0e99\u0eb5\u0ec4\u0ea7\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94', badge: 'OpenAI' },
+  // ─── Anthropic Claude ───
+  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'anthropic', desc: '\u0e84\u0eb4\u0e94\u0ea7\u0eb4\u0ec0\u0e84\u0eb2\u0eb0\u0e94\u0eb5\u0ec0\u0ea5\u0eb5\u0e94 \u0e82\u0ead\u0e87 Anthropic', badge: 'Claude' },
+  { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0ec0\u0e81\u0eb1\u0ec8\u0e87 \u0ec4\u0ea7 \u0e9c\u0eb0\u0ea5\u0e97\u0ee4\u0e94\u0e94\u0eb5', badge: 'Claude' },
+  { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0ec0\u0e81\u0eb1\u0ec8\u0e87\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94 \u0ea7\u0eb4\u0ec0\u0e84\u0eb2\u0eb0\u0e9c\u0eb0\u0ea5 \u0ec0\u0e81\u0eb1\u0ec8\u0e87\u0ec0\u0ea5\u0eb5\u0e94', badge: 'Claude' },
+  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', desc: '\u0ec3\u0eab\u0ea1\u0ec8\u0ea5\u0ec8\u0eb2\u0eaa\u0eb8\u0e94! Adaptive Reasoning \u0eaa\u0eb0\u0eab\u0ebc\u0eb2\u0e94\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94', badge: 'Claude' },
 ];
 
 function ModelSelect({ value, onChange }) {
@@ -193,7 +201,7 @@ export default function App() {
   const [authForm, setAuthForm] = useState({ username: '', password: '' });
 
   const [sources, setSources] = useState([]);
-  const [selSrcId, setSelSrcId] = useState(null);
+  const [selSrcIds, setSelSrcIds] = useState([]);
   const [stats, setStats] = useState(null);
   const [activeTest, setActiveTest] = useState(null);
   const [systemPrompts, setSystemPrompts] = useState(['default']);
@@ -231,10 +239,17 @@ export default function App() {
   const [previewTotalScore, setPreviewTotalScore] = useState(10);
 
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [colorTheme, setColorTheme] = useState(() => localStorage.getItem('colorTheme') || 'purple');
+  
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     localStorage.setItem('theme', dark ? 'dark' : 'light');
   }, [dark]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-color', colorTheme);
+    localStorage.setItem('colorTheme', colorTheme);
+  }, [colorTheme]);
 
   const { ts, show } = useToast();
   const fileRef = useRef(null);
@@ -282,14 +297,14 @@ export default function App() {
     try {
       const r = await api.post('/api/auth/guest', {});
       const d = await r.json();
-      if (r.ok) { setUser({ username: d.username, isGuest: true, profile_pic: d.profile_pic }); loadSources(); loadStats(); loadSystemPrompts(); show('Guest mode'); }
+        if (r.ok) { setUser({ username: d.username, isGuest: true, profile_pic: d.profile_pic }); loadSources(); loadStats(); loadSystemPrompts(); show('ເຂົ້າໃຊ້ໃນໂໝດທົດລອງ'); }
     } catch { showAlert('ເກີດຂໍ້ຜິດພາດ'); }
   };
 
   const handleLogout = async () => {
     await api.post('/api/auth/logout', {});
     localStorage.removeItem('last_test_id');
-    setUser(null); setSources([]); setStats(null); setActiveTest(null); setSelSrcId(null);
+    setUser(null); setSources([]); setStats(null); setActiveTest(null); setSelSrcIds([]);
   };
 
   // ─── Data ───
@@ -314,6 +329,19 @@ export default function App() {
   const restoreLastTest = async () => {
     const lastId = localStorage.getItem('last_test_id');
     if (lastId) await loadTest(parseInt(lastId));
+  };
+
+  const toggleSourceSelect = (id) => {
+    setSelSrcIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      const selectedNames = sources.filter(s => next.includes(s.id)).map(s => s.filename).join(', ');
+      if (next.length > 0) {
+        show(`ເລືອກ: ${selectedNames}`);
+      } else {
+        show('ຍົກເລີກການເລືອກທັງໝົດ');
+      }
+      return next;
+    });
   };
 
   const handleUpload = async (file) => {
@@ -367,7 +395,7 @@ export default function App() {
       if (r.ok) {
         show('ອັບໂຫລດສຳເລັດ');
         await loadSources();
-        setSelSrcId(d.id);
+        setSelSrcIds([d.id]);
         loadStats();
       } else {
         showAlert(d.error);
@@ -383,13 +411,13 @@ export default function App() {
   const deleteSource = (id) => {
     showConfirm('ລົບໄຟລ໌ນີ້?', async () => {
       const r = await api.del(`/api/sources/${id}`);
-      if (r.ok) { if (selSrcId === id) setSelSrcId(null); loadSources(); loadStats(); show('ລົບແລ້ວ'); }
+      if (r.ok) { setSelSrcIds(prev => prev.filter(x => x !== id)); loadSources(); loadStats(); show('ລົບແລ້ວ'); }
     });
   };
 
   // ─── Quiz ───
   const generateTest = async () => {
-    if (!selSrcId) { show('ເລືອກ PDF ກ່ອນ'); return; }
+    if (selSrcIds.length === 0) { show('ເລືອກໄຟລ໌ກ່ອນ'); return; }
     
     setGenLoading(true); setConfigOpen(false);
     try {
@@ -397,7 +425,9 @@ export default function App() {
       const openai_key = localStorage.getItem('openai_api_key') || '';
       const anthropic_key = localStorage.getItem('anthropic_api_key') || '';
       const r = await api.post('/api/tests/generate', {
-        source_id: selSrcId, num_questions: cfg.numQ, difficulty: cfg.diff,
+        source_id: selSrcIds[0],
+        source_ids: selSrcIds,
+        num_questions: cfg.numQ, difficulty: cfg.diff,
         question_type: cfg.type, custom_instructions: cfg.custom,
         language: cfg.lang, shuffle_options: cfg.shuffle, 
         model: cfg.model || 'gemini-2.5-flash',
@@ -407,7 +437,7 @@ export default function App() {
       const d = await r.json();
       if (r.ok) { setActiveTest(d); loadStats(); show('ສ້າງບົດສອບເສັງສຳເລັດ!'); }
       else showAlert(d.error);
-    } catch { showAlert('Error'); }
+    } catch { showAlert('ເກີດຂໍ້ຜິດພາດໃນການສ້າງບົດສອບເສັງ'); }
     setGenLoading(false);
   };
 
@@ -530,7 +560,7 @@ export default function App() {
     });
   };
 
-  const selSrc = sources.find(s => s.id === selSrcId);
+  const selSources = sources.filter(s => selSrcIds.includes(s.id));
 
   // ═══ AUTH ═══
   if (!user) return (
@@ -544,13 +574,13 @@ export default function App() {
           <button className={`auth-toggle-btn ${authMode === 'register' ? 'active' : ''}`} onClick={() => setAuthMode('register')}>ລົງທະບຽນ</button>
         </div>
         <form onSubmit={handleAuth}>
-          <div className="md-field"><label>ຊື່ຜູ້ໃຊ້</label><input className="md-input" required placeholder="username" value={authForm.username} onChange={e => setAuthForm(p => ({ ...p, username: e.target.value }))} /></div>
-          <div className="md-field"><label>ລະຫັດຜ່ານ</label><input className="md-input" type="password" required placeholder="password" value={authForm.password} onChange={e => setAuthForm(p => ({ ...p, password: e.target.value }))} /></div>
+          <div className="md-field"><label>ຊື່ຜູ້ໃຊ້</label><input className="md-input" required placeholder="ຊື່ຜູ້ໃຊ້" value={authForm.username} onChange={e => setAuthForm(p => ({ ...p, username: e.target.value }))} /></div>
+          <div className="md-field"><label>ລະຫັດຜ່ານ</label><input className="md-input" type="password" required placeholder="ລະຫັດຜ່ານ" value={authForm.password} onChange={e => setAuthForm(p => ({ ...p, password: e.target.value }))} /></div>
           <button type="submit" className="md-btn-filled">{authMode === 'login' ? 'ເຂົ້າລະບົບ' : 'ສ້າງບັນຊີ'}</button>
         </form>
         <div className="md-divider">ຫຼື</div>
-        <button className="md-btn-tonal" onClick={handleGuest}>ທົດລອງໃຊ້ (Guest)</button>
-        <p className="auth-note">Guest ໃຊ້ຖານຂໍ້ມູນຮ່ວມ</p>
+        <button className="md-btn-tonal" onClick={handleGuest}>ທົດລອງໃຊ້ (ຜູ້ເຂົ້າຊົມ)</button>
+        <p className="auth-note">ຜູ້ໃຊ້ທົດລອງ ໃຊ້ຖານຂໍ້ມູນຮ່ວມ</p>
       </div>
       <Snackbar ts={ts} />
     </div>
@@ -582,7 +612,7 @@ export default function App() {
           </>}
         </div>
 
-        <div className="sb-label">Sources <span className="sb-count">{sources.length}</span></div>
+        <div className="sb-label">ແຫຼ່ງຂໍ້ມູນ <span className="sb-count">{sources.length}</span></div>
 
         {/* Source list */}
         <div className="sb-list">
@@ -592,25 +622,31 @@ export default function App() {
               <p>ອັບໂຫລດໄຟລ໌ບົດຮຽນເພື່ອເລີ່ມ</p>
             </div>
           )}
-          {sources.map(s => (
-            <div key={s.id} className={`sb-item ${selSrcId === s.id ? 'active' : ''}`} onClick={() => { setSelSrcId(s.id); show(`ເລືອກ: ${s.filename}`); }}>
-              <div className="sb-item-icon"><I name="file" size={14} /></div>
-              <div className="sb-item-info">
-                <div className="sb-item-name" title={s.filename}>{s.filename}</div>
-                <div className="sb-item-meta">{(s.file_size / 1024).toFixed(1)} KB</div>
+          {sources.map(s => {
+            const isSelected = selSrcIds.includes(s.id);
+            return (
+              <div key={s.id} className={`sb-item ${isSelected ? 'active' : ''}`} onClick={() => toggleSourceSelect(s.id)}>
+                <input 
+                  type="checkbox" 
+                  checked={isSelected} 
+                  readOnly 
+                  style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--md-primary)', marginRight: 2 }}
+                />
+                <div className="sb-item-icon"><I name="file" size={14} /></div>
+                <div className="sb-item-info">
+                  <div className="sb-item-name" title={s.filename}>{s.filename}</div>
+                  <div className="sb-item-meta">{(s.file_size / 1024).toFixed(1)} KB</div>
+                </div>
+                <button className="sb-item-del" onClick={e => { e.stopPropagation(); deleteSource(s.id); }}><I name="trash" size={12} /></button>
               </div>
-              <button className="sb-item-del" onClick={e => { e.stopPropagation(); deleteSource(s.id); }}><I name="trash" size={12} /></button>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Footer */}
-        <div className="sb-footer">
-          <button className="icon-btn" onClick={() => setDark(d => !d)} title="Dark mode">
-            <I name={dark ? 'sun' : 'moon'} size={16} />
-          </button>
-          <button className="icon-btn" onClick={() => setSettingsOpen(true)} title="API Key"><I name="key" size={16} /></button>
-          <div className="sb-user" onClick={() => setProfileOpen(true)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} title="ຕັ້ງຄ່າບັນຊີ">
+        <div className="sb-footer" style={{ display: 'flex', alignItems: 'center', padding: '12px', borderTop: '1px solid var(--md-outline-variant)' }}>
+          <button className="icon-btn" onClick={() => setSettingsOpen(true)} title="ຕັ້ງຄ່າທົ່ວໄປ"><I name="settings" size={16} /></button>
+          <div className="sb-user" onClick={() => setProfileOpen(true)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto' }} title="ຕັ້ງຄ່າບັນຊີ">
             {user.profile_pic ? (
               <img src={user.profile_pic} alt="Avatar" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
             ) : (
@@ -620,7 +656,7 @@ export default function App() {
             )}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span className="sb-user-name" style={{ lineHeight: '1.2' }}>{user.username}</span>
-              {user.isGuest && <span className="sb-guest" style={{ fontSize: 10 }}>GUEST</span>}
+              {user.isGuest && <span className="sb-guest" style={{ fontSize: 10 }}>ທົດລອງ</span>}
             </div>
           </div>
           <button className="icon-btn" onClick={handleLogout} title="ອອກ"><I name="logout" size={16} /></button>
@@ -646,7 +682,7 @@ export default function App() {
                 <button className="toolbar-chip" onClick={() => setConfigOpen(true)}>
                   <I name="settings" size={14} /> ຕັ້ງຄ່າ
                 </button>
-                <button className="toolbar-generate" disabled={genLoading || !selSrcId} onClick={generateTest}>
+                <button className="toolbar-generate" disabled={genLoading || selSrcIds.length === 0} onClick={generateTest}>
                   {genLoading ? <><div className="md-spinner on-primary" style={{ width: 16, height: 16 }} /> ກຳລັງສ້າງ...</> : <><I name="wand" size={16} /> ສ້າງບົດສອບເສັງ</>}
                 </button>
               </>
@@ -677,7 +713,7 @@ export default function App() {
 
                     {!activeTest.rich_text_content && (
                       <button className="toolbar-chip" onClick={() => { show('ດາວໂຫລດ Word...'); window.location.href = `/api/tests/${activeTest.id}/export/docx`; }}>
-                        <I name="download" size={14} /> Word
+                        <I name="download" size={14} /> ສົ່ງອອກ Word
                       </button>
                     )}
                   </div>
@@ -885,8 +921,8 @@ export default function App() {
               <div className="center-empty animate-in">
                 <div className="center-empty-icon"><I name="wand" size={44} /></div>
                 <h2>ສ້າງບົດສອບເສັງ</h2>
-                <p>{selSrc ? `ແຫຼ່ງ: "${selSrc.filename}" — ກົດ "ສ້າງບົດສອບເສັງ" ທາງເທິງ` : 'ເລືອກໄຟລ໌ ທາງຊ້າຍ ແລ້ວກົດ "ສ້າງບົດສອບເສັງ"'}</p>
-                {!selSrc && (
+                <p>{selSources.length > 0 ? `ແຫຼ່ງ: "${selSources.map(s => s.filename).join(', ')}" — ກົດ "ສ້າງບົດສອບເສັງ" ທາງເທິງ` : 'ເລືອກໄຟລ໌ ທາງຊ້າຍ ແລ້ວກົດ "ສ້າງບົດສອບເສັງ"'}</p>
+                {selSources.length === 0 && (
                   <button className="md-btn-tonal" style={{ width: 'auto', padding: '10px 24px', marginTop: 20 }} onClick={() => fileRef.current?.click()}>
                     <I name="upload" size={16} /> ອັບໂຫລດໄຟລ໌ບົດຮຽນ
                   </button>
@@ -944,14 +980,14 @@ export default function App() {
             <div className="dialog-header">ຕັ້ງຄ່າບົດສອບເສັງ</div>
             <div className="dialog-body">
               <div className="config-field">
-                <div className="config-field-label">ໂມເດວ AI (Model)</div>
+                <div className="config-field-label">ໂມເດວ AI</div>
                 <ModelSelect value={cfg.model || 'gemini-2.5-flash'} onChange={val => setCfg(p => ({ ...p, model: val }))} />
               </div>
               <div className="config-field">
-                <div className="config-field-label">System Prompt</div>
+                <div className="config-field-label">ຄຳສັ່ງລະບົບ (System Prompt)</div>
                 <select className="md-select" value={cfg.systemPrompt || 'default'} onChange={e => setCfg(p => ({ ...p, systemPrompt: e.target.value }))}>
                   {systemPrompts.map(sp => (
-                    <option key={sp} value={sp}>{sp === 'default' ? 'ມາດຕະຖານ (Default)' : sp}</option>
+                    <option key={sp} value={sp}>{sp === 'default' ? 'ມາດຕະຖານ' : sp}</option>
                   ))}
                 </select>
               </div>
@@ -973,22 +1009,22 @@ export default function App() {
                 <div className="config-field-label">ພາສາ</div>
                 <select className="md-select" value={cfg.lang} onChange={e => setCfg(p => ({ ...p, lang: e.target.value }))}>
                   <option value="lao">ພາສາລາວ</option>
-                  <option value="english">English</option>
+                  <option value="english">ພາສາອັງກິດ</option>
                   <option value="mixed">ປະສົມ</option>
                 </select>
               </div>
               <div className="config-field">
                 <div className="config-field-label">ຮູບແບບ</div>
                 <select className="md-select" value={cfg.type} onChange={e => setCfg(p => ({ ...p, type: e.target.value }))}>
-                  <option value="multiple_choice">ປາລະໄນ (Multiple Choice)</option>
-                  <option value="true_false">ຖືກ / ຜິດ (True / False)</option>
-                  <option value="short_answer">ອັດຕະໄນ (Short Answer / Essay)</option>
+                  <option value="multiple_choice">ປາລະໄນ (ເລືອກຕອບ)</option>
+                  <option value="true_false">ຖືກ / ຜິດ</option>
+                  <option value="short_answer">ອັດຕະໄນ (ຂຽນຕອບ)</option>
                   <option value="mixed">ປະສົມ (ປາລະໄນ & ອັດຕະໄນ)</option>
                 </select>
               </div>
               <div className="config-field">
                 <div className="config-field-label">ຄຳສັ່ງເພີ່ມ</div>
-                <textarea className="md-textarea" rows="2" placeholder="ເນັ້ນບົດທີ 3..." value={cfg.custom} onChange={e => setCfg(p => ({ ...p, custom: e.target.value }))} />
+                <textarea className="md-textarea" rows={2} placeholder="ເນັ້ນບົດທີ 3..." value={cfg.custom} onChange={e => setCfg(p => ({ ...p, custom: e.target.value }))} />
               </div>
               <label className="md-custom-checkbox-row">
                 <input type="checkbox" className="md-custom-checkbox-input" checked={cfg.shuffle} onChange={e => setCfg(p => ({ ...p, shuffle: e.target.checked }))} />
@@ -1009,22 +1045,66 @@ export default function App() {
       {/* ═══ SETTINGS DIALOG ═══ */}
       {settingsOpen && (
         <div className="dialog-scrim" onClick={() => setSettingsOpen(false)}>
-          <div className="dialog-card" onClick={e => e.stopPropagation()}>
-            <div className="dialog-header">ຕັ້ງຄ່າ API Keys</div>
-            <div className="dialog-body">
-              <div className="md-field"><label>Gemini API Key</label><input className="md-input" type="password" id="api-key-in" placeholder="AIzaSy..." defaultValue={localStorage.getItem('gemini_api_key') || ''} /></div>
-              <div className="md-field" style={{marginTop: 10}}><label>OpenAI API Key</label><input className="md-input" type="password" id="openai-key-in" placeholder="sk-..." defaultValue={localStorage.getItem('openai_api_key') || ''} /></div>
-              <div className="md-field" style={{marginTop: 10}}><label>Anthropic API Key</label><input className="md-input" type="password" id="anthropic-key-in" placeholder="sk-ant-..." defaultValue={localStorage.getItem('anthropic_api_key') || ''} /></div>
-              <p style={{ fontSize: 13, color: 'var(--md-outline)', marginTop: 10 }}>ໃສ່ Key ຂອງທ່ານ ຖ້າເຊີບເວີບໍ່ໄດ້ຕັ້ງ .env</p>
+          <div className="dialog-card animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 500 }}>
+            <div className="dialog-header">ການຕັ້ງຄ່າ</div>
+            <div className="dialog-body" style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Appearance Section */}
+              <div>
+                <h4 style={{ marginBottom: 12, color: 'var(--md-primary)', fontSize: 16 }}>ຮູບແບບ ແລະ ສີສັນ</h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                  <span style={{ fontSize: 14 }}>ໂໝດໜ້າຈໍ:</span>
+                  <button className="md-btn-tonal" onClick={() => setDark(d => !d)} style={{ padding: '6px 16px', height: 'auto', borderRadius: 'var(--shape-full)' }}>
+                    <I name={dark ? 'moon' : 'sun'} size={16} style={{ marginRight: 6 }} /> 
+                    {dark ? 'ໂໝດກາງຄືນ' : 'ໂໝດກາງເວັນ'}
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <span style={{ fontSize: 14 }}>ສີຫຼັກ:</span>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    {[
+                      { id: 'purple', hex: '#6750A4' },
+                      { id: 'blue', hex: '#0061A4' },
+                      { id: 'green', hex: '#2E6B27' },
+                      { id: 'rose', hex: '#9B4051' },
+                      { id: 'orange', hex: '#8C5000' }
+                    ].map(c => (
+                      <button 
+                        key={c.id}
+                        onClick={() => setColorTheme(c.id)}
+                        style={{
+                          width: 32, height: 32, borderRadius: '50%',
+                          background: c.hex, border: 'none', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          boxShadow: colorTheme === c.id ? '0 0 0 2px var(--md-surface), 0 0 0 4px var(--md-primary)' : 'none',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {colorTheme === c.id && <I name="check" size={16} style={{ color: '#fff' }} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* API Keys Section */}
+              <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: 20 }}>
+                <h4 style={{ marginBottom: 12, color: 'var(--md-primary)', fontSize: 16 }}>ລະຫັດ API ຂອງ AI</h4>
+                <div className="md-field"><label>ລະຫັດ API ຂອງ Gemini</label><input className="md-input" type="password" id="api-key-in" placeholder="AIzaSy..." defaultValue={localStorage.getItem('gemini_api_key') || ''} /></div>
+                <div className="md-field" style={{marginTop: 10}}><label>ລະຫັດ API ຂອງ OpenAI</label><input className="md-input" type="password" id="openai-key-in" placeholder="sk-..." defaultValue={localStorage.getItem('openai_api_key') || ''} /></div>
+                <div className="md-field" style={{marginTop: 10}}><label>ລະຫັດ API ຂອງ Anthropic</label><input className="md-input" type="password" id="anthropic-key-in" placeholder="sk-ant-..." defaultValue={localStorage.getItem('anthropic_api_key') || ''} /></div>
+                <p style={{ fontSize: 13, color: 'var(--md-outline)', marginTop: 10 }}>ໃສ່ Key ຂອງທ່ານ ຖ້າເຊີບເວີບໍ່ໄດ້ຕັ້ງ .env</p>
+              </div>
+
             </div>
-            <div className="dialog-actions">
+            <div className="dialog-actions" style={{ padding: '8px 24px 24px' }}>
               <button className="md-btn-text" onClick={() => setSettingsOpen(false)}>ປິດ</button>
-              <button className="md-btn-text" onClick={() => { 
-                localStorage.setItem('gemini_api_key', document.getElementById('api-key-in').value.trim()); 
-                localStorage.setItem('openai_api_key', document.getElementById('openai-key-in').value.trim()); 
-                localStorage.setItem('anthropic_api_key', document.getElementById('anthropic-key-in').value.trim()); 
+              <button className="md-btn-filled" onClick={() => { 
+                localStorage.setItem('gemini_api_key', (document.getElementById('api-key-in') as HTMLInputElement).value.trim()); 
+                localStorage.setItem('openai_api_key', (document.getElementById('openai-key-in') as HTMLInputElement).value.trim()); 
+                localStorage.setItem('anthropic_api_key', (document.getElementById('anthropic-key-in') as HTMLInputElement).value.trim()); 
                 setSettingsOpen(false); show('ບັນທຶກແລ້ວ'); 
-              }}>ບັນທຶກ</button>
+              }} style={{ width: 'auto', padding: '10px 24px', borderRadius: 'var(--shape-full)' }}>ບັນທຶກ</button>
             </div>
           </div>
         </div>
@@ -1039,11 +1119,11 @@ export default function App() {
               <div className="md-field">
                 <label>ປະເພດຄຳຖາມ</label>
                 <select className="md-select" value={editModal.qType || 'obj'} onChange={e => setEditModal(p => ({ ...p, qType: e.target.value }))}>
-                  <option value="obj">ປາລະໄນ (Multiple Choice)</option>
-                  <option value="subj">ອັດຕະໄນ (Short Answer/Essay)</option>
+                  <option value="obj">ປາລະໄນ</option>
+                  <option value="subj">ອັດຕະໄນ</option>
                 </select>
               </div>
-              <div className="md-field"><label>ຄຳຖາມ</label><textarea className="md-textarea" rows="2" value={editModal.question_text} onChange={e => setEditModal(p => ({ ...p, question_text: e.target.value }))} /></div>
+              <div className="md-field"><label>ຄຳຖາມ</label><textarea className="md-textarea" rows={2} value={editModal.question_text} onChange={e => setEditModal(p => ({ ...p, question_text: e.target.value }))} /></div>
               
               {editModal.qType !== 'subj' && (
                 <>
@@ -1060,12 +1140,12 @@ export default function App() {
                 </>
               )}
               
-              <div className="md-field"><label>{editModal.qType === 'subj' ? 'ຄຳຕອບ' : 'ຄຳອະທິບາຍ'}</label><textarea className="md-textarea" rows="2" value={editModal.explanation || ''} onChange={e => setEditModal(p => ({ ...p, explanation: e.target.value }))} /></div>
+              <div className="md-field"><label>{editModal.qType === 'subj' ? 'ຄຳຕອບ' : 'ຄຳອະທິບາຍ'}</label><textarea className="md-textarea" rows={2} value={editModal.explanation || ''} onChange={e => setEditModal(p => ({ ...p, explanation: e.target.value }))} /></div>
             </div>
             <div className="dialog-actions">
               <button className="md-btn-text" onClick={() => setEditModal(null)}>ຍົກເລີກ</button>
               <button className="md-btn-text" onClick={() => {
-                let d = { question_text: editModal.question_text, explanation: editModal.explanation };
+                let d: any = { question_text: editModal.question_text, explanation: editModal.explanation };
                 if (editModal.qType === 'subj') {
                   d = { ...d, option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'A' };
                 } else {
@@ -1141,7 +1221,7 @@ export default function App() {
       {profileOpen && (
         <div className="dialog-scrim" onClick={() => setProfileOpen(false)}>
           <div className="dialog-card animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
-            <div className="dialog-header">ຕັ້ງຄ່າບັນຊີ (Profile)</div>
+            <div className="dialog-header">ຕັ້ງຄ່າບັນຊີ</div>
             <div className="dialog-body" style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
               
               {/* Profile Pic Section */}
@@ -1180,7 +1260,7 @@ export default function App() {
               {/* Delete Account Section */}
               {!user.isGuest && (
                 <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
-                  <h4 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--md-error)' }}>ລົບບັນຊີຖາວອນ (Danger Zone)</h4>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--md-error)' }}>ລົບບັນຊີຖາວອນ (ເຂດອັນຕະລາຍ)</h4>
                   <button 
                     className="md-btn-text" 
                     style={{ color: 'var(--md-error)', width: '100%', border: '1px solid var(--md-error)' }}

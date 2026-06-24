@@ -1,194 +1,42 @@
-from flask import Flask, request, jsonify, render_template, send_file, session, send_from_directory
+from fastapi import FastAPI, Request, status, File, UploadFile, Form
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from starlette.middleware.sessions import SessionMiddleware
 import os
 import pypdf
 import io
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
 import pytesseract
 from pdf2image import convert_from_bytes
-
-# Configure Tesseract and Poppler paths for Windows
-POPPLER_PATH = r"C:\Users\idea\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
-# Import our custom helper modules
 import database
 import llm_helper
-import gemini_helper # Keep around for backward compatibility if needed
+import gemini_helper
 
-# Load environment variables
 load_dotenv()
 
-app = Flask(__name__, template_folder='templates', static_folder='frontend/dist', static_url_path='')
-app.secret_key = os.getenv("SECRET_KEY", "test-lm-default-secret-key-123456")
+app = FastAPI()
+
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key=os.getenv("SECRET_KEY", "test-lm-default-secret-key-123456")
+)
 
 # Initialize SQLite database
 database.init_db()
 
-# Authentication Decorator
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return jsonify({"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True}), 401
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Authentication Routes
-@app.route('/api/auth/register', methods=['POST'])
-def register():
-    data = request.json
-    if not data or 'username' not in data or 'password' not in data:
-        return jsonify({"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"}), 400
-    
-    username = data['username'].strip()
-    password = data['password']
-    
-    if not username or not password:
-        return jsonify({"error": "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ສາມາດຫວ່າງເປົ່າໄດ້"}), 400
-        
-    if len(username) < 3:
-        return jsonify({"error": "ຊື່ຜູ້ໃຊ້ຕ້ອງມີຢ່າງໜ້ອຍ 3 ຕົວອັກສອນ"}), 400
-        
-    if len(password) < 4:
-        return jsonify({"error": "ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 4 ຕົວອັກສອນ"}), 400
-        
-    existing_user = database.get_user_by_username(username)
-    if existing_user:
-        return jsonify({"error": "ຊື່ຜູ້ໃຊ້ນີ້ຖືກໃຊ້ໄປແລ້ວ"}), 400
-        
-    try:
-        password_hash = generate_password_hash(password)
-        user_id = database.create_user(username, password_hash)
-        if user_id:
-            session['user_id'] = user_id
-            session['username'] = username
-            session['is_guest'] = False
-            return jsonify({"message": "ລົງທະບຽນສຳເລັດ", "user_id": user_id, "username": username})
-        else:
-            return jsonify({"error": "ບໍ່ສາມາດສ້າງບັນຊີໄດ້"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/auth/login', methods=['POST'])
-def login():
-    data = request.json
-    if not data or 'username' not in data or 'password' not in data:
-        return jsonify({"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"}), 400
-        
-    username = data['username'].strip()
-    password = data['password']
-    
-    try:
-        user = database.get_user_by_username(username)
-        if not user or not check_password_hash(user['password_hash'], password):
-            return jsonify({"error": "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ"}), 401
-            
-        session['user_id'] = user['id']
-        session['username'] = user['username']
-        session['is_guest'] = (user['username'] == 'guest')
-        profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={user['username']}&background=random"
-        return jsonify({
-            "message": "ເຂົ້າລະບົບສຳເລັດ", 
-            "user_id": user['id'], 
-            "username": user['username'], 
-            "is_guest": session['is_guest'],
-            "profile_pic": profile_pic
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/auth/guest', methods=['POST'])
-def guest_login():
-    try:
-        username = 'guest'
-        user = database.get_user_by_username(username)
-        if not user:
-            dummy_hash = generate_password_hash('guest_bypass_hash_code_123')
-            user_id = database.create_user(username, dummy_hash, token_limit=50000)
-            if not user_id:
-                user = database.get_user_by_username(username)
-                if user:
-                    user_id = user['id']
-                else:
-                    return jsonify({"error": "ບໍ່ສາມາດສ້າງບັນຊີ Guest ໄດ້"}), 500
-        else:
-            user_id = user['id']
-            
-        session['user_id'] = user_id
-        session['username'] = username
-        session['is_guest'] = True
-        return jsonify({
-            "message": "ເຂົ້າລະບົບໃນຖານະ Guest ສຳເລັດ", 
-            "user_id": user_id, 
-            "username": username, 
-            "is_guest": True
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/auth/logout', methods=['POST'])
-def logout():
-    session.clear()
-    return jsonify({"message": "ອອກຈາກລະບົບສຳເລັດ"})
-
-@app.route('/api/auth/me', methods=['GET'])
-def get_current_user():
-    if 'user_id' in session:
-        user = database.get_user_by_id(session['user_id'])
-        profile_pic = None
-        if user:
-            profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={session['username']}&background=random"
-        return jsonify({
-            "logged_in": True,
-            "user_id": session['user_id'],
-            "username": session['username'],
-            "is_guest": session.get('is_guest', False),
-            "profile_pic": profile_pic
-        })
-    return jsonify({"logged_in": False})
+POPPLER_PATH = r"C:\Users\idea\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
+pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 UPLOAD_AVATAR_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'avatars')
 os.makedirs(UPLOAD_AVATAR_FOLDER, exist_ok=True)
-app.config['UPLOAD_AVATAR_FOLDER'] = UPLOAD_AVATAR_FOLDER
 
-@app.route('/uploads/avatars/<path:filename>')
-def uploaded_avatar(filename):
-    return send_from_directory(app.config['UPLOAD_AVATAR_FOLDER'], filename)
+# Helper to check authentication
+def get_current_user(request: Request):
+    user_id = request.session.get('user_id')
+    if not user_id:
+        return None
+    return user_id
 
-@app.route('/api/user/profile-pic', methods=['POST'])
-@login_required
-def upload_profile_pic():
-    if session.get('is_guest'): return jsonify({"error": "ບັນຊີ Guest ບໍ່ສາມາດປ່ຽນຮູບໂປຣໄຟລ໌ໄດ້"}), 403
-    if 'file' not in request.files: return jsonify({"error": "ບໍ່ພົບໄຟລ໌"}), 400
-    file = request.files['file']
-    if file.filename == '': return jsonify({"error": "ບໍ່ໄດ້ເລືອກໄຟລ໌"}), 400
-    
-    ext = os.path.splitext(file.filename)[1].lower()
-    if ext not in ['.jpg', '.jpeg', '.png']: return jsonify({"error": "ຮອງຮັບສະເພາະຮູບພາບ (JPG, PNG)"}), 400
-    
-    import uuid
-    filename = f"{session['user_id']}_{uuid.uuid4().hex}{ext}"
-    filepath = os.path.join(app.config['UPLOAD_AVATAR_FOLDER'], filename)
-    file.save(filepath)
-    
-    pic_url = f"/uploads/avatars/{filename}"
-    database.update_user_profile_pic(session['user_id'], pic_url)
-    return jsonify({"message": "ອັບເດດຮູບໂປຣໄຟລ໌ສຳເລັດ", "profile_pic": pic_url})
-
-@app.route('/api/user/account', methods=['DELETE'])
-@login_required
-def delete_account():
-    if session.get('is_guest'):
-        return jsonify({"error": "ບັນຊີ Guest ບໍ່ສາມາດລົບບັນຊີໄດ້"}), 403
-    try:
-        database.delete_user_account(session['user_id'])
-        session.clear()
-        return jsonify({"message": "ລົບບັນຊີສຳເລັດ"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-# Helper function to extract text from PDF
 def extract_text_from_pdf(file_stream, page_start=1, page_end=None):
     try:
         reader = pypdf.PdfReader(file_stream)
@@ -197,7 +45,6 @@ def extract_text_from_pdf(file_stream, page_start=1, page_end=None):
         start_idx = max(0, (page_start or 1) - 1)
         end_idx = min(total_pages, page_end if page_end is not None else total_pages)
         
-        # Get raw bytes of the file stream for pdf2image if OCR fallback is needed
         file_stream.seek(0)
         pdf_bytes = file_stream.read()
         
@@ -206,7 +53,6 @@ def extract_text_from_pdf(file_stream, page_start=1, page_end=None):
             page = reader.pages[i]
             page_text = page.extract_text()
             
-            # If PyPDF extracted virtually no text, run OCR fallback for this page
             if not page_text or len(page_text.strip()) < 15:
                 page_num = i + 1
                 print(f"PyPDF extracted minimal text for page {page_num}. Trying Tesseract OCR fallback...")
@@ -244,7 +90,6 @@ def extract_text_from_image(file_stream):
         file_stream.seek(0)
         img = Image.open(file_stream)
         
-        # Try Tesseract OCR first (offline, fast, free)
         try:
             print("Extracting text from image using Tesseract OCR...")
             ocr_text = pytesseract.image_to_string(img, lang='lao+eng')
@@ -254,7 +99,6 @@ def extract_text_from_image(file_stream):
         except Exception as ocr_err:
             print(f"Tesseract OCR failed on image: {ocr_err}")
             
-        # Fall back to Gemini Vision
         print("Tesseract OCR yielded insufficient text, falling back to Gemini Vision...")
         import gemini_helper
         file_stream.seek(0)
@@ -269,206 +113,485 @@ def extract_text_from_image(file_stream):
         print(f"Error reading Image: {e}")
         return None
 
-# Serve Frontend Home Page
-@app.route('/')
-def index():
-    return send_from_directory(app.static_folder, 'index.html')
-
-# Catch-all route for React client-side routing
-@app.route('/<path:path>')
-def catch_all(path):
-    if path.startswith('api/'):
-        return jsonify({"error": "Not found"}), 404
-    file_path = os.path.join(app.static_folder, path)
-    if os.path.isfile(file_path):
-        return send_from_directory(app.static_folder, path)
-    return send_from_directory(app.static_folder, 'index.html')
-
-# API Endpoints for Sources (Lesson PDFs)
-@app.route('/api/sources', methods=['GET'])
-@login_required
-def get_sources():
-    try:
-        sources = database.list_sources(session['user_id'])
-        return jsonify(sources)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/sources/upload/info', methods=['POST'])
-@login_required
-def upload_source_info():
-    if 'file' not in request.files:
-        return jsonify({"error": "ບໍ່ພົບໄຟລ໌ທີ່ອັບໂຫລດ"}), 400
+def generate_docx_file(test_data):
+    from docx import Document
+    from docx.shared import Pt, Inches
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
     
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "ຊື່ໄຟລ໌ບໍ່ຖືກຕ້ອງ"}), 400
+    doc = Document()
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
         
+    style = doc.styles['Normal']
+    font = style.font
+    font.name = 'Noto Sans Lao'
+    font.size = Pt(12)
+    
+    title_p = doc.add_paragraph()
+    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    title_run = title_p.add_run(test_data['title'])
+    title_run.bold = True
+    title_run.font.size = Pt(16)
+    
+    diff_map = {'easy': 'ງ່າຍ', 'medium': 'ປານກາງ', 'hard': 'ຍາກ'}
+    diff_lao = diff_map.get(test_data['difficulty'].lower(), test_data['difficulty'])
+    
+    info_p = doc.add_paragraph()
+    info_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    info_run = info_p.add_run(f"ລະດັບຄວາມຍາກ: {diff_lao}  |  ຈຳນວນ: {test_data['num_questions']} ຂໍ້\n")
+    info_run.font.size = Pt(11)
+    info_run.italic = True
+    
+    table = doc.add_table(rows=1, cols=3)
+    table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = "ຊື່ ແລະ ນາມສະກຸນ: ....................................."
+    hdr_cells[1].text = "ຫ້ອງຮຽນ: ................."
+    hdr_cells[2].text = "ວັນທີ: ....../....../......"
+    
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                for run in paragraph.runs:
+                    run.font.name = 'Noto Sans Lao'
+                    run.font.size = Pt(11)
+                    
+    doc.add_paragraph()
+    lao_options = {'A': 'ກ', 'B': 'ຂ', 'C': 'ຄ', 'D': 'ງ'}
+    
+    objective_qs = [q for q in test_data['questions'] if not (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')]
+    subjective_qs = [q for q in test_data['questions'] if (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')]
+
+    if objective_qs:
+        sec1_p = doc.add_paragraph()
+        sec1_run = sec1_p.add_run("I. ພາກປາລະໄນ (ຄຳຖາມເລືອກຕອບ)")
+        sec1_run.bold = True
+        sec1_run.font.size = Pt(13)
+        doc.add_paragraph()
+        
+        for idx, q in enumerate(objective_qs, 1):
+            qp = doc.add_paragraph()
+            q_run = qp.add_run(f"ຂໍ້ {idx}. {q['question_text']}")
+            q_run.bold = True
+            
+            for opt_key, opt_val in [('A', q['option_a']), ('B', q['option_b']), ('C', q['option_c']), ('D', q['option_d'])]:
+                if opt_val.strip() != '':
+                    op = doc.add_paragraph()
+                    op.paragraph_format.left_indent = Inches(0.4)
+                    op.paragraph_format.space_after = Pt(2)
+                    opt_lao = lao_options[opt_key]
+                    op.add_run(f"{opt_lao}. {opt_val}")
+            doc.add_paragraph()
+
+    if subjective_qs:
+        sec2_p = doc.add_paragraph()
+        sec2_run = sec2_p.add_run("II. ພາກອັດຕະໄນ (ຄຳຖາມອະທິບາຍ/ຕອບສັ້ນ)")
+        sec2_run.bold = True
+        sec2_run.font.size = Pt(13)
+        doc.add_paragraph()
+        
+        for idx, q in enumerate(subjective_qs, 1):
+            qp = doc.add_paragraph()
+            start_num = len(objective_qs) + idx if objective_qs else idx
+            q_run = qp.add_run(f"ຂໍ້ {start_num}. {q['question_text']}")
+            q_run.bold = True
+            
+            for _ in range(3):
+                op = doc.add_paragraph()
+                op.paragraph_format.left_indent = Inches(0.4)
+                op.paragraph_format.space_after = Pt(2)
+                op.add_run("....................................................................................................................................................")
+            doc.add_paragraph()
+        
+    doc.add_page_break()
+    
+    key_title_p = doc.add_paragraph()
+    key_title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    key_title_run = key_title_p.add_run("ສະເລີຍຄຳຕອບ ແລະ ຄຳອະທິບາຍ (Answer Key)")
+    key_title_run.bold = True
+    key_title_run.font.size = Pt(14)
+    doc.add_paragraph()
+    
+    for i, q in enumerate(test_data['questions'], 1):
+        kp = doc.add_paragraph()
+        is_subjective = (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')
+        
+        if is_subjective:
+            k_run1 = kp.add_run(f"ຂໍ້ {i}. ແນວທາງຄຳຕອບ: ")
+            k_run2 = kp.add_run(q.get('explanation') or 'ບໍ່ມີແນວທາງຄຳຕອບ')
+            k_run2.bold = True
+        else:
+            correct_lao = lao_options.get(q['correct_option'], q['correct_option'])
+            k_run1 = kp.add_run(f"ຂໍ້ {i}. ຕອບ: ")
+            k_run2 = kp.add_run(f"{correct_lao}")
+            k_run2.bold = True
+            
+            opt_field = f"option_{q['correct_option'].lower()}"
+            correct_text = q.get(opt_field, '')
+            kp.add_run(f" ({correct_text})\n")
+            
+            explanation_text = q.get('explanation') or 'ບໍ່ມີຄຳອະທິບາຍ'
+            k_run3 = kp.add_run(f"ອະທິບາຍ: {explanation_text}")
+            k_run3.font.size = Pt(10.5)
+            k_run3.italic = True
+        
+        doc.add_paragraph()
+        
+    docx_stream = io.BytesIO()
+    doc.save(docx_stream)
+    docx_stream.seek(0)
+    return docx_stream
+
+# Auth Routes
+@app.post("/api/auth/register")
+async def register(request: Request):
+    data = await request.json()
+    if not data or 'username' not in data or 'password' not in data:
+        return JSONResponse(status_code=400, content={"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"})
+    
+    username = data['username'].strip()
+    password = data['password']
+    
+    if not username or not password:
+        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ສາມາດຫວ່າງເປົ່າໄດ້"})
+        
+    if len(username) < 3:
+        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ຕ້ອງມີຢ່າງໜ້ອຍ 3 ຕົວອັກសອນ"})
+        
+    if len(password) < 4:
+        return JSONResponse(status_code=400, content={"error": "ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 4 ຕົວອັກសອນ"})
+        
+    existing_user = database.get_user_by_username(username)
+    if existing_user:
+        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ນີ້ຖືກໃຊ້ໄປແລ້ວ"})
+        
+    try:
+        password_hash = generate_password_hash(password)
+        user_id = database.create_user(username, password_hash)
+        if user_id:
+            request.session['user_id'] = user_id
+            request.session['username'] = username
+            request.session['is_guest'] = False
+            return {"message": "ລົງທະບຽນສຳເລັດ", "user_id": user_id, "username": username}
+        else:
+            return JSONResponse(status_code=500, content={"error": "ບໍ່ສາມາດສ້າງບັນຊີໄດ້"})
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.post("/api/auth/login")
+async def login(request: Request):
+    data = await request.json()
+    if not data or 'username' not in data or 'password' not in data:
+        return JSONResponse(status_code=400, content={"error": "ข้อมูลບໍ່ຄົບຖ້ວນ"})
+        
+    username = data['username'].strip()
+    password = data['password']
+    
+    try:
+        user = database.get_user_by_username(username)
+        if not user or not check_password_hash(user['password_hash'], password):
+            return JSONResponse(status_code=401, content={"error": "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ"})
+            
+        request.session['user_id'] = user['id']
+        request.session['username'] = user['username']
+        request.session['is_guest'] = (user['username'] == 'guest')
+        profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={user['username']}&background=random"
+        return {
+            "message": "ເຂົ້າລະບົບສຳເລັດ", 
+            "user_id": user['id'], 
+            "username": user['username'], 
+            "is_guest": request.session['is_guest'],
+            "profile_pic": profile_pic
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.post("/api/auth/guest")
+async def guest_login(request: Request):
+    try:
+        username = 'guest'
+        user = database.get_user_by_username(username)
+        if not user:
+            dummy_hash = generate_password_hash('guest_bypass_hash_code_123')
+            user_id = database.create_user(username, dummy_hash, token_limit=50000)
+            if not user_id:
+                user = database.get_user_by_username(username)
+                if user:
+                    user_id = user['id']
+                else:
+                    return JSONResponse(status_code=500, content={"error": "ບໍ່ສາມາດສ້າງບັນຊີ Guest ໄດ້"})
+        else:
+            user_id = user['id']
+            
+        request.session['user_id'] = user_id
+        request.session['username'] = username
+        request.session['is_guest'] = True
+        return {
+            "message": "ເຂົ້າລະບົບໃນຖານະ Guest ສຳເລັດ", 
+            "user_id": user_id, 
+            "username": username, 
+            "is_guest": True
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.post("/api/auth/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return {"message": "ອອກຈາກລະບົບສຳເລັດ"}
+
+@app.get("/api/auth/me")
+async def get_me(request: Request):
+    user_id = get_current_user(request)
+    if user_id:
+        user = database.get_user_by_id(user_id)
+        profile_pic = None
+        if user:
+            profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={request.session['username']}&background=random"
+        return {
+            "logged_in": True,
+            "user_id": user_id,
+            "username": request.session['username'],
+            "is_guest": request.session.get('is_guest', False),
+            "profile_pic": profile_pic
+        }
+    return {"logged_in": False}
+
+# User Profile pic & delete
+@app.post("/api/user/profile-pic")
+async def upload_profile_pic(request: Request, file: UploadFile = File(...)):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    if request.session.get('is_guest'):
+        return JSONResponse(status_code=403, content={"error": "ບັນຊີ Guest ບໍ່ສາມາດປ່ຽນຮູບໂປຣໄຟລ໌ໄດ້"})
+    
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.jpg', '.jpeg', '.png']:
+        return JSONResponse(status_code=400, content={"error": "ຮອງຮັບສະເພາະຮູບພາບ (JPG, PNG)"})
+    
+    import uuid
+    filename = f"{user_id}_{uuid.uuid4().hex}{ext}"
+    filepath = os.path.join(UPLOAD_AVATAR_FOLDER, filename)
+    file_bytes = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(file_bytes)
+        
+    pic_url = f"/uploads/avatars/{filename}"
+    database.update_user_profile_pic(user_id, pic_url)
+    return {"message": "ອັບເດດຮູບໂປຣໄຟລ໌ສຳເລັດ", "profile_pic": pic_url}
+
+@app.delete("/api/user/account")
+async def delete_account(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    if request.session.get('is_guest'):
+        return JSONResponse(status_code=403, content={"error": "ບັນຊີ Guest ບໍ່ສາມາດລົບບັນຊີໄດ້"})
+    try:
+        database.delete_user_account(user_id)
+        request.session.clear()
+        return {"message": "ລົບບັນຊີສຳເລັດ"}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# Sources Routes
+@app.get("/api/sources")
+async def get_sources(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    try:
+        sources = database.list_sources(user_id)
+        return sources
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@app.post("/api/sources/upload/info")
+async def upload_source_info(request: Request, file: UploadFile = File(...)):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    
     filename_lower = file.filename.lower()
     if not filename_lower.endswith('.pdf'):
-        return jsonify({"total_pages": 0, "is_pdf": False})
+        return {"total_pages": 0, "is_pdf": False}
         
     try:
-        file_bytes = file.read()
+        file_bytes = await file.read()
         file_stream = io.BytesIO(file_bytes)
         reader = pypdf.PdfReader(file_stream)
         total_pages = len(reader.pages)
-        return jsonify({"total_pages": total_pages, "is_pdf": True})
+        return {"total_pages": total_pages, "is_pdf": True}
     except Exception as e:
         print(f"Error reading PDF info: {e}")
-        return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການອ່ານໄຟລ໌: {str(e)}"}), 500
+        return JSONResponse(status_code=500, content={"error": f"ເກີດຂໍ້ຜິດພາດໃນການອ່ານໄຟລ໌: {str(e)}"})
 
-@app.route('/api/sources/upload', methods=['POST'])
-@login_required
-def upload_source():
-    if 'file' not in request.files:
-        return jsonify({"error": "ບໍ່ພົບໄຟລ໌ທີ່ອັບໂຫລດ"}), 400
-    
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"error": "ຊື່ໄຟລ໌ບໍ່ຖືກຕ້ອງ"}), 400
+@app.post("/api/sources/upload")
+async def upload_source(
+    request: Request,
+    file: UploadFile = File(...),
+    page_start: str = Form(None),
+    page_end: str = Form(None)
+):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
         
     filename_lower = file.filename.lower()
     allowed_extensions = ('.pdf', '.docx', '.jpg', '.jpeg', '.png')
     if not filename_lower.endswith(allowed_extensions):
-        return jsonify({"error": "ຮອງຮັບສະເພາະໄຟລ໌ PDF, DOCX ແລະ ຮູບພາບເທົ່ານັ້ນ"}), 400
+        return JSONResponse(status_code=400, content={"error": "ຮອງຮັບສະເພາະໄຟລ໌ PDF, DOCX ແລະ ຮູບພາບເທົ່ານັ້ນ"})
         
     try:
-        # Read the file contents into memory stream to parse
-        file_bytes = file.read()
+        file_bytes = await file.read()
         file_size = len(file_bytes)
         file_stream = io.BytesIO(file_bytes)
         
-        page_start = request.form.get('page_start')
-        page_end = request.form.get('page_end')
-        if page_start is not None and page_start != '':
-            page_start = int(page_start)
-        else:
-            page_start = None
-            
-        if page_end is not None and page_end != '':
-            page_end = int(page_end)
-        else:
-            page_end = None
+        p_start = int(page_start) if page_start and page_start.strip() != "" else None
+        p_end = int(page_end) if page_end and page_end.strip() != "" else None
         
         extracted_text = None
         if filename_lower.endswith('.pdf'):
-            extracted_text = extract_text_from_pdf(file_stream, page_start=page_start, page_end=page_end)
+            extracted_text = extract_text_from_pdf(file_stream, page_start=p_start, page_end=p_end)
         elif filename_lower.endswith('.docx'):
             extracted_text = extract_text_from_docx(file_stream)
         else:
             extracted_text = extract_text_from_image(file_stream)
             
         if not extracted_text:
-            return jsonify({"error": "ບໍ່ສາມາດອ່ານຂໍ້ຄວາມຈາກໄຟລ໌ໄດ້ ຫຼື ໄຟລ໌ຫວ່າງເປົ່າ"}), 400
+            return JSONResponse(status_code=400, content={"error": "ບໍ່ສາມາດອ່ານຂໍ້ຄວາມຈາກໄຟລ໌ໄດ້ ຫຼື ໄຟລ໌ຫວ່າງເປົ່າ"})
             
-        source_id = database.add_source(file.filename, file_size, extracted_text, session['user_id'])
-        
-        return jsonify({
+        source_id = database.add_source(file.filename, file_size, extracted_text, user_id)
+        return {
             "id": source_id,
             "filename": file.filename,
             "file_size": file_size,
             "message": "ອັບໂຫລດ ແລະ ວິເຄາະບົດຮຽນສຳເລັດ"
-        })
+        }
     except Exception as e:
         print(f"Upload error: {e}")
-        return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການອັບໂຫລດ: {str(e)}"}), 500
+        return JSONResponse(status_code=500, content={"error": f"ເກີດຂໍ້ຜິດພາດໃນການອັບໂຫລດ: {str(e)}"})
 
-@app.route('/api/sources/<int:source_id>', methods=['DELETE'])
-@login_required
-def delete_source(source_id):
+@app.delete("/api/sources/{source_id}")
+async def delete_source(request: Request, source_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
     try:
-        source = database.get_source(source_id, session['user_id'])
+        source = database.get_source(source_id, user_id)
         if not source:
-            return jsonify({"error": "ບໍ່ພົບບົດຮຽນນີ້"}), 404
-            
-        database.delete_source(source_id, session['user_id'])
-        return jsonify({"message": "ລົບບົດຮຽນສຳເລັດ"})
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບບົດຮຽນນີ້"})
+        database.delete_source(source_id, user_id)
+        return {"message": "ລົບບົດຮຽນສຳເລັດ"}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-@app.route('/api/sources/<int:source_id>/preview', methods=['GET'])
-@login_required
-def preview_source(source_id):
+@app.get("/api/sources/{source_id}/preview")
+async def preview_source(request: Request, source_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
     try:
-        source = database.get_source(source_id, session['user_id'])
+        source = database.get_source(source_id, user_id)
         if not source:
-            return jsonify({"error": "ບໍ່ພົບບົດຮຽນນີ້"}), 404
-        return jsonify({
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບບົດຮຽນນີ້"})
+        return {
             "id": source["id"],
             "filename": source["filename"],
             "text_content": source["text_content"]
-        })
+        }
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-# API Endpoints for Tests
-@app.route('/api/tests', methods=['GET'])
-@login_required
-def get_tests():
+# Tests Routes
+@app.get("/api/tests")
+async def get_tests(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
     try:
-        tests = database.list_tests(session['user_id'])
-        return jsonify(tests)
+        tests = database.list_tests(user_id)
+        return tests
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-@app.route('/api/tests/<int:test_id>', methods=['GET'])
-@login_required
-def get_test(test_id):
+@app.get("/api/tests/{test_id}")
+async def get_test(request: Request, test_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
     try:
-        test = database.get_test(test_id, session['user_id'])
+        test = database.get_test(test_id, user_id)
         if not test:
-            return jsonify({"error": "ບໍ່ພົບການສອບເສັງນີ້"}), 404
-        return jsonify(test)
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບການສອບເສັງນີ້"})
+        return test
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-@app.route('/api/tests/<int:test_id>', methods=['DELETE'])
-@login_required
-def delete_test(test_id):
+@app.delete("/api/tests/{test_id}")
+async def delete_test(request: Request, test_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
     try:
-        test = database.get_test(test_id, session['user_id'])
+        test = database.get_test(test_id, user_id)
         if not test:
-            return jsonify({"error": "ບໍ່ພົບການສອບເສັງນີ້"}), 404
-            
-        database.delete_test(test_id, session['user_id'])
-        return jsonify({"message": "ລົບການສອບເສັງສຳເລັດ"})
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບການສອບເສັງນີ້"})
+        database.delete_test(test_id, user_id)
+        return {"message": "ລົບການສອບເສັງສຳເລັດ"}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-@app.route('/api/tests/<int:test_id>/rich_text', methods=['PUT'])
-@login_required
-def update_test_rich_text(test_id):
-    data = request.json
+@app.put("/api/tests/{test_id}/rich_text")
+async def update_test_rich_text(request: Request, test_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    data = await request.json()
     if not data or 'rich_text_content' not in data:
-        return jsonify({"error": "ບໍ່ມີເນື້ອຫາສົ່ງມາ"}), 400
+        return JSONResponse(status_code=400, content={"error": "ບໍ່ມີເນື້ອຫາສົ່ງມາ"})
     try:
-        success = database.update_test_rich_text(test_id, session['user_id'], data['rich_text_content'])
+        success = database.update_test_rich_text(test_id, user_id, data['rich_text_content'])
         if not success:
-            return jsonify({"error": "ບໍ່ພົບການສອບເສັງ ຫຼື ບໍ່ມີສິດ"}), 404
-        return jsonify({"message": "ບັນທຶກເອກະສານສຳເລັດ"})
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບການສອບເສັງ ຫຼື ບໍ່ມີສິດ"})
+        return {"message": "ບັນທຶກເອກະສານສຳເລັດ"}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-@app.route('/api/system-prompts', methods=['GET'])
-@login_required
-def get_system_prompts():
+@app.get("/api/system-prompts")
+async def get_system_prompts(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
     prompt_dir = os.path.join(os.path.dirname(__file__), 'system-prompt-lao')
     prompts = ['default']
     if os.path.exists(prompt_dir):
         for f in os.listdir(prompt_dir):
             if f.endswith('.txt'):
                 prompts.append(f[:-4])
-    return jsonify(prompts)
+    return prompts
 
-@app.route('/api/tests/generate', methods=['POST'])
-@login_required
-def generate_test():
-    data = request.json
-    if not data or 'source_id' not in data:
-        return jsonify({"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ (ຕ້ອງການ source_id)"}), 400
+@app.post("/api/tests/generate")
+async def generate_test(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    data = await request.json()
+    if not data or ('source_id' not in data and 'source_ids' not in data):
+        return JSONResponse(status_code=400, content={"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ (ຕ້ອງການ source_id)"})
         
-    source_id = data['source_id']
+    source_ids = data.get('source_ids', [])
+    if not source_ids and 'source_id' in data:
+        if isinstance(data['source_id'], list):
+            source_ids = data['source_id']
+        else:
+            source_ids = [data['source_id']]
+
     num_questions = int(data.get('num_questions', 10))
     difficulty = data.get('difficulty', 'medium')
     question_type = data.get('question_type', 'multiple_choice')
@@ -493,18 +616,22 @@ def generate_test():
     api_keys = data.get('api_keys', {})
     if data.get('api_key'):
         api_keys['gemini'] = data.get('api_key')
-    
+        
     try:
-        source = database.get_source(source_id, session['user_id'])
-        if not source:
-            return jsonify({"error": "ບໍ່ພົບບົດຮຽນທີ່ເລືອກ"}), 404
+        combined_text = ""
+        valid_source_ids = []
+        for sid in source_ids:
+            source = database.get_source(sid, user_id)
+            if source:
+                valid_source_ids.append(sid)
+                combined_text += f"--- ຂໍ້ມູນຈາກໄຟລ໌: {source['filename']} ---\n{source['text_content']}\n\n"
+                
+        if not combined_text:
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບບົດຮຽນທີ່ເລືອກ"})
             
-        user_stats = database.get_dashboard_stats(session['user_id'])
-            
-        # Generate questions via LLM
         gemini_response, token_count = llm_helper.generate_test_questions(
             model_name=model,
-            context_text=source['text_content'],
+            context_text=combined_text,
             num_questions=num_questions,
             difficulty_lao=difficulty,
             question_type=question_type,
@@ -514,7 +641,6 @@ def generate_test():
             api_keys=api_keys
         )
         
-        # Shuffle options if requested
         if shuffle_options and question_type == 'multiple_choice':
             import random
             for q in gemini_response['questions']:
@@ -531,40 +657,39 @@ def generate_test():
                 q['option_b'] = options[1][1]
                 q['option_c'] = options[2][1]
                 q['option_d'] = options[3][1]
-                # Find new position of correct answer
                 for new_key_idx, (_, text) in enumerate(options):
                     if text == correct_text:
                         q['correct_option'] = ['A', 'B', 'C', 'D'][new_key_idx]
                         break
-        
-        # Save generated test and questions to SQLite database
+                        
         test_id = database.create_test(
             title=gemini_response['title'],
             difficulty=difficulty,
             num_questions=len(gemini_response['questions']),
-            source_id=source_id,
+            source_id=valid_source_ids[0] if valid_source_ids else None,
             questions=gemini_response['questions'],
-            user_id=session['user_id']
+            user_id=user_id
         )
         
-        saved_test = database.get_test(test_id, session['user_id'])
-        # Attach extra metadata for the frontend
+        saved_test = database.get_test(test_id, user_id)
         saved_test['time_limit'] = time_limit
-        return jsonify(saved_test)
+        return saved_test
         
     except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
+        return JSONResponse(status_code=400, content={"error": str(ve)})
     except Exception as e:
         print(f"Generation error: {e}")
-        return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການສ້າງຄຳຖາມ: {str(e)}"}), 500
+        return JSONResponse(status_code=500, content={"error": f"ເກີດຂໍ້ຜິດພາດໃນການສ້າງຄຳຖາມ: {str(e)}"})
 
-# API Endpoints for Individual Questions (Editing)
-@app.route('/api/questions/<int:question_id>', methods=['PUT'])
-@login_required
-def update_question(question_id):
-    data = request.json
+# Questions Edit/Delete
+@app.put("/api/questions/{question_id}")
+async def update_question(request: Request, question_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    data = await request.json()
     if not data:
-        return jsonify({"error": "ບໍ່ມີຂໍ້ມູນສົ່ງມາ"}), 400
+        return JSONResponse(status_code=400, content={"error": "ບໍ່ມີຂໍ້ມູນສົ່ງມາ"})
         
     try:
         result = database.update_question(
@@ -576,29 +701,33 @@ def update_question(question_id):
             option_d=data['option_d'],
             correct_option=data['correct_option'],
             explanation=data.get('explanation', ''),
-            user_id=session['user_id']
+            user_id=user_id
         )
         if result is False:
-            return jsonify({"error": "ບໍ່ພົບຄຳຖາມ ຫຼື ບໍ່ມີສິດ"}), 404
-        return jsonify({"message": "ແກ້ໄຂຄຳຖາມສຳເລັດ"})
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບຄຳຖາມ ຫຼື ບໍ່ມີສິດ"})
+        return {"message": "ແກ້ໄຂຄຳຖາມສຳເລັດ"}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-@app.route('/api/questions/<int:question_id>', methods=['DELETE'])
-@login_required
-def delete_question(question_id):
+@app.delete("/api/questions/{question_id}")
+async def delete_question(request: Request, question_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
     try:
-        database.delete_question(question_id, user_id=session['user_id'])
-        return jsonify({"message": "ລົບຄຳຖາມສຳເລັດ"})
+        database.delete_question(question_id, user_id=user_id)
+        return {"message": "ລົບຄຳຖາມສຳເລັດ"}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-@app.route('/api/questions', methods=['POST'])
-@login_required
-def add_question():
-    data = request.json
+@app.post("/api/questions")
+async def add_question(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    data = await request.json()
     if not data or 'test_id' not in data:
-        return jsonify({"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"}), 400
+        return JSONResponse(status_code=400, content={"error": "ข้อมูลບໍ່ຄົບຖ້ວນ"})
         
     try:
         question_id = database.add_question(
@@ -610,37 +739,74 @@ def add_question():
             option_d=data['option_d'],
             correct_option=data['correct_option'],
             explanation=data.get('explanation', ''),
-            user_id=session['user_id']
+            user_id=user_id
         )
         if question_id is None:
-            return jsonify({"error": "ບໍ່ພົບບົດສອບເສັງ ຫຼື ບໍ່ມີສິດ"}), 404
-        return jsonify({"id": question_id, "message": "ເພີ່ມຄຳຖາມສຳເລັດ"})
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບບົດສອບເສັງ ຫຼື ບໍ່ມີສິດ"})
+        return {"id": question_id, "message": "ເພີ່ມຄຳຖາມສຳເລັດ"}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-# API Endpoint for chat interaction with lesson content
-@app.route('/api/chat', methods=['POST'])
-@login_required
-def chat_with_source():
-    data = request.json
+# Stats
+@app.get("/api/dashboard/stats")
+async def get_stats(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    try:
+        stats = database.get_dashboard_stats(user_id)
+        return stats
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# Docx Export (FastAPI StreamingResponse)
+@app.api_route("/api/tests/{test_id}/export/docx", methods=["GET", "POST"])
+async def export_docx(request: Request, test_id: int):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    try:
+        test = database.get_test(test_id, user_id)
+        if not test:
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບການສອບເສັງນີ້"})
+            
+        docx_stream = generate_docx_file(test)
+        filename = f"test_{test_id}.docx"
+        
+        headers = {
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
+        return StreamingResponse(
+            docx_stream,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers=headers
+        )
+    except Exception as e:
+        print(f"Export error: {e}")
+        return JSONResponse(status_code=500, content={"error": f"ເກີດຂໍ້ຜິດພາດໃນການດາວໂຫລດ Word: {str(e)}"})
+
+# Chat Route
+@app.post("/api/chat")
+async def chat_with_source(request: Request):
+    user_id = get_current_user(request)
+    if not user_id:
+        return JSONResponse(status_code=401, content={"error": "ກະລຸນາເຂົ້າລະບົບກ່ອນ", "auth_required": True})
+    data = await request.json()
     if not data or 'source_id' not in data or 'message' not in data:
-        return jsonify({"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"}), 400
+        return JSONResponse(status_code=400, content={"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"})
         
     source_id = data['source_id']
     new_message = data['message']
     chat_history = data.get('history', [])
-    
     model = data.get('model', 'gemini-2.5-flash')
     api_keys = data.get('api_keys', {})
     if data.get('api_key'):
         api_keys['gemini'] = data.get('api_key')
-    
+        
     try:
-        source = database.get_source(source_id, session['user_id'])
+        source = database.get_source(source_id, user_id)
         if not source:
-            return jsonify({"error": "ບໍ່ພົບບົດຮຽນນີ້"}), 404
-            
-        user_stats = database.get_dashboard_stats(session['user_id'])
+            return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບບົດຮຽນນີ້"})
             
         response_text, token_count = llm_helper.generate_chat_response(
             model_name=model,
@@ -649,198 +815,38 @@ def chat_with_source():
             context_text=source['text_content'],
             api_keys=api_keys
         )
-        return jsonify({"response": response_text})
+        return {"response": response_text}
     except ValueError as ve:
-        return jsonify({"error": str(ve)}), 400
+        return JSONResponse(status_code=400, content={"error": str(ve)})
     except Exception as e:
         print(f"Chat error: {e}")
-        return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການສົນທະນາ: {str(e)}"}), 500
+        return JSONResponse(status_code=500, content={"error": f"ເກີດຂໍ້ຜິດພາດໃນການສົນທະນາ: {str(e)}"})
 
-# API Endpoint for Dashboard Statistics
-@app.route('/api/dashboard/stats', methods=['GET'])
-@login_required
-def get_dashboard_stats_endpoint():
-    try:
-        stats = database.get_dashboard_stats(session['user_id'])
-        return jsonify(stats)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+# Serve Uploads Avatar
+@app.get("/uploads/avatars/{filename:path}")
+def uploaded_avatar(filename: str):
+    file_path = os.path.join(UPLOAD_AVATAR_FOLDER, filename)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return JSONResponse(status_code=404, content={"detail": "Avatar not found"})
 
-# API Endpoint to export test to Word (.docx)
-@app.route('/api/tests/<int:test_id>/export/docx', methods=['GET', 'POST'])
-@login_required
-def export_docx(test_id):
-    try:
-        test = database.get_test(test_id, session['user_id'])
-        if not test:
-            return jsonify({"error": "ບໍ່ພົບການສອບເສັງນີ້"}), 404
-            
-        docx_stream = generate_docx_file(test)
-        
-        # Safe ASCII/URL encoded filename for download
-        filename = f"test_{test_id}.docx"
-        
-        return send_file(
-            docx_stream,
-            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            as_attachment=True,
-            download_name=filename
-        )
-    except Exception as e:
-        print(f"Export error: {e}")
-        return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການດາວໂຫລດ Word: {str(e)}"}), 500
+# Static Files serving (Vite dist build)
+static_dir = os.path.join(os.path.dirname(__file__), 'frontend', 'dist')
 
-# Word Document (.docx) Generator Helper
-def generate_docx_file(test_data):
-    from docx import Document
-    from docx.shared import Pt, Inches
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
-    
-    doc = Document()
-    
-    # Page setup - Margins
-    for section in doc.sections:
-        section.top_margin = Inches(1)
-        section.bottom_margin = Inches(1)
-        section.left_margin = Inches(1)
-        section.right_margin = Inches(1)
-        
-    # Set default font
-    style = doc.styles['Normal']
-    font = style.font
-    font.name = 'Noto Sans Lao'
-    font.size = Pt(12)
-    
-    # Header/Title
-    title_p = doc.add_paragraph()
-    title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title_run = title_p.add_run(test_data['title'])
-    title_run.bold = True
-    title_run.font.size = Pt(16)
-    
-    # Subtitle Info
-    diff_map = {'easy': 'ງ່າຍ', 'medium': 'ປານກາງ', 'hard': 'ຍາກ'}
-    diff_lao = diff_map.get(test_data['difficulty'].lower(), test_data['difficulty'])
-    
-    info_p = doc.add_paragraph()
-    info_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    info_run = info_p.add_run(f"ລະດັບຄວາມຍາກ: {diff_lao}  |  ຈຳນວນ: {test_data['num_questions']} ຂໍ້\n")
-    info_run.font.size = Pt(11)
-    info_run.italic = True
-    
-    # Student Header Info Table
-    table = doc.add_table(rows=1, cols=3)
-    table.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    
-    # Auto-fit table cells
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = "ຊື່ ແລະ ນາມສະກຸນ: ....................................."
-    hdr_cells[1].text = "ຫ້ອງຮຽນ: ................."
-    hdr_cells[2].text = "ວັນທີ: ....../....../......"
-    
-    # Set font for all cells in tables
-    for row in table.rows:
-        for cell in row.cells:
-            for paragraph in cell.paragraphs:
-                for run in paragraph.runs:
-                    run.font.name = 'Noto Sans Lao'
-                    run.font.size = Pt(11)
-                    
-    doc.add_paragraph() # space
-    
-    lao_options = {'A': 'ກ', 'B': 'ຂ', 'C': 'ຄ', 'D': 'ງ'}
-    
-    # Questions loop - Partition into Objective and Subjective
-    objective_qs = [q for q in test_data['questions'] if not (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')]
-    subjective_qs = [q for q in test_data['questions'] if (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')]
+@app.get("/")
+def serve_index():
+    return FileResponse(os.path.join(static_dir, 'index.html'))
 
-    # Section I: Objective Part
-    if objective_qs:
-        sec1_p = doc.add_paragraph()
-        sec1_run = sec1_p.add_run("I. ພາກປາລະໄນ (ຄຳຖາມເລືອກຕອບ)")
-        sec1_run.bold = True
-        sec1_run.font.size = Pt(13)
-        doc.add_paragraph() # space
-        
-        for idx, q in enumerate(objective_qs, 1):
-            qp = doc.add_paragraph()
-            q_run = qp.add_run(f"ຂໍ້ {idx}. {q['question_text']}")
-            q_run.bold = True
-            
-            # Options
-            for opt_key, opt_val in [('A', q['option_a']), ('B', q['option_b']), ('C', q['option_c']), ('D', q['option_d'])]:
-                if opt_val.strip() != '':
-                    op = doc.add_paragraph()
-                    op.paragraph_format.left_indent = Inches(0.4)
-                    op.paragraph_format.space_after = Pt(2)
-                    opt_lao = lao_options[opt_key]
-                    op.add_run(f"{opt_lao}. {opt_val}")
-            doc.add_paragraph() # spacing
-
-    # Section II: Subjective Part
-    if subjective_qs:
-        sec2_p = doc.add_paragraph()
-        sec2_run = sec2_p.add_run("II. ພາກອັດຕະໄນ (ຄຳຖາມອະທິບາຍ/ຕອບສັ້ນ)")
-        sec2_run.bold = True
-        sec2_run.font.size = Pt(13)
-        doc.add_paragraph() # space
-        
-        for idx, q in enumerate(subjective_qs, 1):
-            qp = doc.add_paragraph()
-            start_num = len(objective_qs) + idx if objective_qs else idx
-            q_run = qp.add_run(f"ຂໍ້ {start_num}. {q['question_text']}")
-            q_run.bold = True
-            
-            # Add 3 rows of dotted lines
-            for _ in range(3):
-                op = doc.add_paragraph()
-                op.paragraph_format.left_indent = Inches(0.4)
-                op.paragraph_format.space_after = Pt(2)
-                op.add_run("....................................................................................................................................................")
-            doc.add_paragraph() # spacing
-        
-    # Answer Key Page Break
-    doc.add_page_break()
-    
-    key_title_p = doc.add_paragraph()
-    key_title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    key_title_run = key_title_p.add_run("ສະເລີຍຄຳຕອບ ແລະ ຄຳອະທິບາຍ (Answer Key)")
-    key_title_run.bold = True
-    key_title_run.font.size = Pt(14)
-    doc.add_paragraph()
-    
-    for i, q in enumerate(test_data['questions'], 1):
-        kp = doc.add_paragraph()
-        is_subjective = (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')
-        
-        if is_subjective:
-            k_run1 = kp.add_run(f"ຂໍ້ {i}. ແນວທາງຄຳຕອບ: ")
-            k_run2 = kp.add_run(q.get('explanation') or 'ບໍ່ມີແນວທາງຄຳຕອບ')
-            k_run2.bold = True
-        else:
-            correct_lao = lao_options.get(q['correct_option'], q['correct_option'])
-            k_run1 = kp.add_run(f"ຂໍ້ {i}. ຕອບ: ")
-            k_run2 = kp.add_run(f"{correct_lao}")
-            k_run2.bold = True
-            
-            # Add actual text of the correct option
-            opt_field = f"option_{q['correct_option'].lower()}"
-            correct_text = q.get(opt_field, '')
-            kp.add_run(f" ({correct_text})\n")
-            
-            explanation_text = q.get('explanation') or 'ບໍ່ມີຄຳອະທິບາຍ'
-            k_run3 = kp.add_run(f"ອະທິບາຍ: {explanation_text}")
-            k_run3.font.size = Pt(10.5)
-            k_run3.italic = True
-        
-        doc.add_paragraph()
-        
-    # Save to BytesIO
-    docx_stream = io.BytesIO()
-    doc.save(docx_stream)
-    docx_stream.seek(0)
-    return docx_stream
+@app.get("/{path:path}")
+def serve_static_or_index(path: str):
+    if path.startswith("api/"):
+        return JSONResponse(status_code=404, content={"error": "Not found"})
+    file_path = os.path.join(static_dir, path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    return FileResponse(os.path.join(static_dir, 'index.html'))
 
 if __name__ == '__main__':
+    import uvicorn
     port = int(os.getenv("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    uvicorn.run(app, host='0.0.0.0', port=port)

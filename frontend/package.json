@@ -6,8 +6,8 @@
   "scripts": {
     "start": "concurrently \"vite\" \"cd .. && python app.py\"",
     "dev": "vite",
-    "build": "vite build",
-    "prod": "vite build && cd .. && python app.py",
+    "build": "tsc -b && vite build",
+    "prod": "tsc -b && vite build && cd .. && python app.py",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -26,6 +26,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.3",
     "oxlint": "^1.69.0",
+    "typescript": "^6.0.3",
     "vite": "^8.1.0"
   }
 }
