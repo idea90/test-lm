@@ -450,6 +450,17 @@ def update_test_rich_text(test_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/system-prompts', methods=['GET'])
+@login_required
+def get_system_prompts():
+    prompt_dir = os.path.join(os.path.dirname(__file__), 'system-prompt-lao')
+    prompts = ['default']
+    if os.path.exists(prompt_dir):
+        for f in os.listdir(prompt_dir):
+            if f.endswith('.txt'):
+                prompts.append(f[:-4])
+    return jsonify(prompts)
+
 @app.route('/api/tests/generate', methods=['POST'])
 @login_required
 def generate_test():
@@ -463,6 +474,17 @@ def generate_test():
     question_type = data.get('question_type', 'multiple_choice')
     custom_instructions = data.get('custom_instructions', '')
     num_options = int(data.get('num_options', 4))
+    
+    system_prompt_name = data.get('system_prompt', 'default')
+    if system_prompt_name and system_prompt_name != 'default':
+        prompt_path = os.path.join(os.path.dirname(__file__), 'system-prompt-lao', f"{system_prompt_name}.txt")
+        if os.path.exists(prompt_path):
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                sys_content = f.read()
+                if custom_instructions:
+                    custom_instructions = f"{sys_content}\n\nUser Custom Instructions:\n{custom_instructions}"
+                else:
+                    custom_instructions = sys_content
     language = data.get('language', 'lao')
     time_limit = int(data.get('time_limit', 0))
     shuffle_options = data.get('shuffle_options', False)
