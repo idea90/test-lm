@@ -23,7 +23,8 @@ def init_db():
             password_hash TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             total_tokens_used INTEGER DEFAULT 0,
-            token_limit INTEGER DEFAULT 500000
+            token_limit INTEGER DEFAULT 500000,
+            profile_pic TEXT
         )
     ''')
     
@@ -93,6 +94,8 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN total_tokens_used INTEGER DEFAULT 0")
     if 'token_limit' not in columns:
         cursor.execute("ALTER TABLE users ADD COLUMN token_limit INTEGER DEFAULT 500000")
+    if 'profile_pic' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN profile_pic TEXT")
         
     conn.commit()
     conn.close()
@@ -131,6 +134,29 @@ def get_user_by_username(username):
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+def get_user_by_id(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def update_user_profile_pic(user_id, profile_pic):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET profile_pic = ? WHERE id = ?", (profile_pic, user_id))
+    conn.commit()
+    conn.close()
+
+def delete_user_account(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Delete sources and tests (and cascade handles the rest)
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
 
 def increment_token_usage(user_id, tokens):
     conn = get_db_connection()

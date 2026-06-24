@@ -201,12 +201,15 @@ export default function App() {
     numQ: 10, diff: 'medium', type: 'multiple_choice',
     lang: 'lao', custom: '', shuffle: false, model: 'gemini-2.5-flash'
   });
+  const [dottedLines, setDottedLines] = useState(3);
+  const [previewSubjInstructions, setPreviewSubjInstructions] = useState('ຈົ່ງຕອບຄຳຖາມລຸ່ມນີ້ໃສ່ບ່ອນວ່າງ:');
   const [genLoading, setGenLoading] = useState(false);
   const [showExp, setShowExp] = useState(true);
 
   const [view, setView] = useState('test');
   const [uploading, setUploading] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [editModal, setEditModal] = useState(null);
   const [configOpen, setConfigOpen] = useState(false);
 
@@ -253,7 +256,7 @@ export default function App() {
       const r = await api.get('/api/auth/me');
       const d = await r.json();
       if (r.ok && d.logged_in) {
-        setUser({ username: d.username, isGuest: d.is_guest });
+        setUser({ username: d.username, isGuest: d.is_guest, profile_pic: d.profile_pic });
         loadSources(); loadStats(); restoreLastTest();
       }
     } catch (e) { console.error(e); }
@@ -266,7 +269,7 @@ export default function App() {
       const r = await api.post(ep, authForm);
       const d = await r.json();
       if (r.ok) {
-        setUser({ username: d.username, isGuest: d.is_guest || false });
+        setUser({ username: d.username, isGuest: d.is_guest || false, profile_pic: d.profile_pic });
         setAuthForm({ username: '', password: '' });
         loadSources(); loadStats(); restoreLastTest();
         show(authMode === 'login' ? 'ເຂົ້າລະບົບສຳເລັດ' : 'ລົງທະບຽນສຳເລັດ');
@@ -278,7 +281,7 @@ export default function App() {
     try {
       const r = await api.post('/api/auth/guest', {});
       const d = await r.json();
-      if (r.ok) { setUser({ username: d.username, isGuest: true }); loadSources(); loadStats(); show('Guest mode'); }
+      if (r.ok) { setUser({ username: d.username, isGuest: true, profile_pic: d.profile_pic }); loadSources(); loadStats(); show('Guest mode'); }
     } catch { showAlert('ເກີດຂໍ້ຜິດພາດ'); }
   };
 
@@ -604,9 +607,18 @@ export default function App() {
             <I name={dark ? 'sun' : 'moon'} size={16} />
           </button>
           <button className="icon-btn" onClick={() => setSettingsOpen(true)} title="API Key"><I name="key" size={16} /></button>
-          <div className="sb-user">
-            <span className="sb-user-name">{user.username}</span>
-            {user.isGuest && <span className="sb-guest">GUEST</span>}
+          <div className="sb-user" onClick={() => setProfileOpen(true)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }} title="ຕັ້ງຄ່າບັນຊີ">
+            {user.profile_pic ? (
+              <img src={user.profile_pic} alt="Avatar" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--md-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span className="sb-user-name" style={{ lineHeight: '1.2' }}>{user.username}</span>
+              {user.isGuest && <span className="sb-guest" style={{ fontSize: 10 }}>GUEST</span>}
+            </div>
           </div>
           <button className="icon-btn" onClick={handleLogout} title="ອອກ"><I name="logout" size={16} /></button>
         </div>
@@ -652,10 +664,15 @@ export default function App() {
                   </div>
                   <div className="preview-btns">
                     {!activeTest.rich_text_content && (
+                      <button className="toolbar-chip" onClick={() => setDottedLines(d => d === 0 ? 3 : d === 3 ? 5 : 0)}>
+                        <I name="edit" size={14} /> ເສັ້ນຂຽນ: {dottedLines === 0 ? 'ປິດ' : `${dottedLines} ແຖວ`}
+                      </button>
+                    )}
+                    {!activeTest.rich_text_content && (
                       <button className="icon-btn" onClick={() => setShowExp(p => !p)} title="ສະແດງ/ເຊື່ອງຄຳຕອບ"><I name={showExp ? 'eyeOff' : 'eye'} size={16} /></button>
                     )}
                     {!activeTest.rich_text_content && (
-                      <button className="icon-btn" onClick={() => setEditModal({ mode: 'add', question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'A', explanation: '' })} title="ເພີ່ມ"><I name="plus" size={16} /></button>
+                      <button className="icon-btn" onClick={() => setEditModal({ mode: 'add', qType: 'obj', question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'A', explanation: '' })} title="ເພີ່ມ"><I name="plus" size={16} /></button>
                     )}
                     <button className="icon-btn" onClick={deleteTest} title="ລົບບົດສອບເສັງ" style={{ color: 'var(--md-error)' }}><I name="trash" size={16} /></button>
                     {!activeTest.rich_text_content && (
@@ -750,91 +767,122 @@ export default function App() {
                           </tr>
                         </tbody>
                       </table>
-
-                      {/* Section label & instructions */}
-                      <div className="exam-instructions-official">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', alignItems: 'center' }}>
-                          <input
-                            className="inline-input"
-                            value={previewSection}
-                            onChange={e => setPreviewSection(e.target.value)}
-                            style={{ fontWeight: 'bold', width: '200px' }}
-                          />
-                          <span>ຄະແນນພາກປາລະໄນ: <input
-                            className="inline-input"
-                            type="number"
-                            value={previewTotalScore}
-                            onChange={e => setPreviewTotalScore(Number(e.target.value) || 0)}
-                            style={{ width: '50px', textAlign: 'center', fontWeight: 'bold' }}
-                          /> ຂໍ້</span>
-                        </div>
-                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-                          <textarea
-                            className="inline-input"
-                            value={previewInstructions}
-                            onChange={e => setPreviewInstructions(e.target.value)}
-                            rows={2}
-                            style={{ flex: 1, resize: 'none', fontSize: '14px' }}
-                          />
-                          <span style={{ whiteSpace: 'nowrap' }}>(ຂໍ້ລະ <input
-                            className="inline-input"
-                            type="number"
-                            value={(previewTotalScore / activeTest.questions.length).toFixed(2)}
-                            onChange={e => setPreviewTotalScore((Number(e.target.value) || 0) * activeTest.questions.length)}
-                            style={{ width: '45px', textAlign: 'center' }}
-                          />)</span>
-                        </div>
-                      </div>
                     </div>
 
-                    {/* Questions — all inline editable */}
-                    {activeTest.questions.map((q, i) => (
-                      <div key={q.id} className="exam-question">
-                        <div className="exam-q-row">
-                          <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, gap: 6 }}>
-                            <strong style={{ whiteSpace: 'nowrap', paddingTop: 2 }}>ຂໍ້ {i + 1}.</strong>
-                            <textarea
-                              className="inline-input"
-                              defaultValue={q.question_text}
-                              rows={2}
-                              style={{ flex: 1, resize: 'none', fontSize: '14px', fontWeight: 500 }}
-                              onBlur={async e => {
-                                const updated = { ...q, question_text: e.target.value };
-                                setActiveTest(p => ({ ...p, questions: p.questions.map(x => x.id === q.id ? updated : x) }));
-                                await api.put(`/api/questions/${q.id}`, updated);
-                              }}
-                            />
-                          </div>
-                          <div className="exam-q-actions">
-                            <button className="icon-btn sm" onClick={() => setEditModal({ mode: 'edit', id: q.id, ...q })}><I name="edit" size={13} /></button>
-                            <button className="icon-btn sm" onClick={() => deleteQ(q.id)}><I name="trash" size={13} /></button>
-                          </div>
-                        </div>
-                        <div className="exam-options-grid">
-                          {['A','B','C','D'].map(o => (
-                            <div key={o} className={`exam-opt ${showExp && q.correct_option === o ? 'correct' : ''}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-                              <span style={{ whiteSpace: 'nowrap', paddingTop: 2 }}>{LAO[o]}.</span>
-                              <textarea
-                                className="inline-input"
-                                defaultValue={q[`option_${o.toLowerCase()}`]}
-                                rows={1}
-                                style={{ flex: 1, resize: 'none', fontSize: '13px' }}
-                                onBlur={async e => {
-                                  const updated = { ...q, [`option_${o.toLowerCase()}`]: e.target.value };
-                                  setActiveTest(p => ({ ...p, questions: p.questions.map(x => x.id === q.id ? updated : x) }));
-                                  await api.put(`/api/questions/${q.id}`, updated);
-                                }}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                        {showExp && (
-                          <div className="exam-answer">
-                            <I name="check" size={13} /> ຄຳຕອບ: <strong>{LAO[q.correct_option]}</strong> — {q.explanation || '—'}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                    {/* Split Questions */}
+                    {(() => {
+                        const objQs = activeTest.questions.filter(q => q.option_a || q.option_b || q.option_c || q.option_d);
+                        const subjQs = activeTest.questions.filter(q => !q.option_a && !q.option_b && !q.option_c && !q.option_d);
+                        let globalQIndex = 0;
+                        return (
+                          <>
+                            {/* Objective Section */}
+                            {objQs.length > 0 && (
+                              <>
+                                <div className="exam-instructions-official">
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', alignItems: 'center' }}>
+                                    <input className="inline-input" value={previewSection} onChange={e => setPreviewSection(e.target.value)} style={{ fontWeight: 'bold', width: '200px' }} />
+                                    <span>ຄະແນນພາກປາລະໄນ: <input className="inline-input" type="number" value={previewTotalScore} onChange={e => setPreviewTotalScore(Number(e.target.value) || 0)} style={{ width: '50px', textAlign: 'center', fontWeight: 'bold' }} /> ຂໍ້</span>
+                                  </div>
+                                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                                    <textarea className="inline-input" value={previewInstructions} onChange={e => setPreviewInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
+                                    <span style={{ whiteSpace: 'nowrap' }}>(ຂໍ້ລະ {(previewTotalScore / objQs.length).toFixed(2)})</span>
+                                  </div>
+                                </div>
+                                {objQs.map((q) => {
+                                  const i = globalQIndex++;
+                                  return (
+                                    <div key={q.id} className="exam-question">
+                                      <div className="exam-q-row">
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, gap: 6 }}>
+                                          <strong style={{ whiteSpace: 'nowrap', paddingTop: 2 }}>ຂໍ້ {i + 1}.</strong>
+                                          <textarea className="inline-input" defaultValue={q.question_text} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px', fontWeight: 500 }} onBlur={async e => {
+                                            const updated = { ...q, question_text: e.target.value };
+                                            setActiveTest(p => ({ ...p, questions: p.questions.map(x => x.id === q.id ? updated : x) }));
+                                            await api.put(`/api/questions/${q.id}`, updated);
+                                          }} />
+                                        </div>
+                                        <div className="exam-q-actions">
+                                          <button className="icon-btn sm" onClick={() => setEditModal({ mode: 'edit', qType: 'obj', id: q.id, ...q })}><I name="edit" size={13} /></button>
+                                          <button className="icon-btn sm" onClick={() => deleteQ(q.id)}><I name="trash" size={13} /></button>
+                                        </div>
+                                      </div>
+                                      <div className="exam-options-grid">
+                                        {['A','B','C','D'].map(o => (
+                                          <div key={o} className={`exam-opt ${showExp && q.correct_option === o ? 'correct' : ''}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                                            <span style={{ whiteSpace: 'nowrap', paddingTop: 2 }}>{LAO[o]}.</span>
+                                            <textarea className="inline-input" defaultValue={q[`option_${o.toLowerCase()}`]} rows={1} style={{ flex: 1, resize: 'none', fontSize: '13px' }} onBlur={async e => {
+                                              const updated = { ...q, [`option_${o.toLowerCase()}`]: e.target.value };
+                                              setActiveTest(p => ({ ...p, questions: p.questions.map(x => x.id === q.id ? updated : x) }));
+                                              await api.put(`/api/questions/${q.id}`, updated);
+                                            }} />
+                                          </div>
+                                        ))}
+                                      </div>
+                                      {showExp && (
+                                        <div className="exam-answer">
+                                          <I name="check" size={13} /> ຄຳຕອບ: <strong>{LAO[q.correct_option]}</strong> — {q.explanation || '—'}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </>
+                            )}
+                            
+                            {/* Subjective Section */}
+                            {subjQs.length > 0 && (
+                              <>
+                                <div className="exam-instructions-official" style={{ marginTop: 24, borderTop: '2px solid #000', paddingTop: 16 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', alignItems: 'center' }}>
+                                    <span>II. ພາກອັດຕະໄນ</span>
+                                    <span>ຄະແນນພາກອັດຕະໄນ ....................</span>
+                                  </div>
+                                  <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                                    <textarea className="inline-input" value={previewSubjInstructions} onChange={e => setPreviewSubjInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
+                                  </div>
+                                </div>
+                                {subjQs.map((q) => {
+                                  const i = globalQIndex++;
+                                  return (
+                                    <div key={q.id} className="exam-question">
+                                      <div className="exam-q-row">
+                                        <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, gap: 6 }}>
+                                          <strong style={{ whiteSpace: 'nowrap', paddingTop: 2 }}>ຂໍ້ {i + 1}.</strong>
+                                          <textarea className="inline-input" defaultValue={q.question_text} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px', fontWeight: 500 }} onBlur={async e => {
+                                            const updated = { ...q, question_text: e.target.value };
+                                            setActiveTest(p => ({ ...p, questions: p.questions.map(x => x.id === q.id ? updated : x) }));
+                                            await api.put(`/api/questions/${q.id}`, updated);
+                                          }} />
+                                        </div>
+                                        <div className="exam-q-actions">
+                                          <button className="icon-btn sm" onClick={() => setEditModal({ mode: 'edit', qType: 'subj', id: q.id, ...q })}><I name="edit" size={13} /></button>
+                                          <button className="icon-btn sm" onClick={() => deleteQ(q.id)}><I name="trash" size={13} /></button>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Dotted Lines */}
+                                      {dottedLines > 0 && (
+                                        <div className="exam-dotted-lines">
+                                          {Array.from({ length: dottedLines }).map((_, di) => (
+                                            <div key={di} className="dotted-line" />
+                                          ))}
+                                        </div>
+                                      )}
+                                      
+                                      {showExp && (
+                                        <div className="exam-answer" style={{ marginTop: 12 }}>
+                                          <I name="check" size={13} /> ຄຳຕອບ: {q.explanation || '—'}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                   </div>
                 )}
               </div>
@@ -929,9 +977,10 @@ export default function App() {
               <div className="config-field">
                 <div className="config-field-label">ຮູບແບບ</div>
                 <select className="md-select" value={cfg.type} onChange={e => setCfg(p => ({ ...p, type: e.target.value }))}>
-                  <option value="multiple_choice">ປາລະໄນ</option>
-                  <option value="true_false">ຖືກ / ຜິດ</option>
-                  <option value="short_answer">ຕອບສັ້ນ</option>
+                  <option value="multiple_choice">ປາລະໄນ (Multiple Choice)</option>
+                  <option value="true_false">ຖືກ / ຜິດ (True / False)</option>
+                  <option value="short_answer">ອັດຕະໄນ (Short Answer / Essay)</option>
+                  <option value="mixed">ປະສົມ (ປາລະໄນ & ອັດຕະໄນ)</option>
                 </select>
               </div>
               <div className="config-field">
@@ -984,23 +1033,41 @@ export default function App() {
           <div className="dialog-card" onClick={e => e.stopPropagation()}>
             <div className="dialog-header">{editModal.mode === 'add' ? 'ເພີ່ມຄຳຖາມ' : 'ແກ້ໄຂ'}</div>
             <div className="dialog-body">
-              <div className="md-field"><label>ຄຳຖາມ</label><textarea className="md-textarea" rows="2" value={editModal.question_text} onChange={e => setEditModal(p => ({ ...p, question_text: e.target.value }))} /></div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                {['A','B','C','D'].map(o => (
-                  <div key={o} className="md-field"><label>ຕົວເລືອກ {LAO[o]}</label><input className="md-input" value={editModal[`option_${o.toLowerCase()}`]} onChange={e => setEditModal(p => ({ ...p, [`option_${o.toLowerCase()}`]: e.target.value }))} /></div>
-                ))}
-              </div>
-              <div className="md-field"><label>ຄຳຕອບ</label>
-                <select className="md-select" value={editModal.correct_option} onChange={e => setEditModal(p => ({ ...p, correct_option: e.target.value }))}>
-                  {['A','B','C','D'].map(o => <option key={o} value={o}>{LAO[o]} ({o})</option>)}
+              <div className="md-field">
+                <label>ປະເພດຄຳຖາມ</label>
+                <select className="md-select" value={editModal.qType || 'obj'} onChange={e => setEditModal(p => ({ ...p, qType: e.target.value }))}>
+                  <option value="obj">ປາລະໄນ (Multiple Choice)</option>
+                  <option value="subj">ອັດຕະໄນ (Short Answer/Essay)</option>
                 </select>
               </div>
-              <div className="md-field"><label>ຄຳອະທິບາຍ</label><textarea className="md-textarea" rows="2" value={editModal.explanation} onChange={e => setEditModal(p => ({ ...p, explanation: e.target.value }))} /></div>
+              <div className="md-field"><label>ຄຳຖາມ</label><textarea className="md-textarea" rows="2" value={editModal.question_text} onChange={e => setEditModal(p => ({ ...p, question_text: e.target.value }))} /></div>
+              
+              {editModal.qType !== 'subj' && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {['A','B','C','D'].map(o => (
+                      <div key={o} className="md-field"><label>ຕົວເລືອກ {LAO[o]}</label><input className="md-input" value={editModal[`option_${o.toLowerCase()}`] || ''} onChange={e => setEditModal(p => ({ ...p, [`option_${o.toLowerCase()}`]: e.target.value }))} /></div>
+                    ))}
+                  </div>
+                  <div className="md-field"><label>ຄຳຕອບທີ່ຖືກຕ້ອງ</label>
+                    <select className="md-select" value={editModal.correct_option} onChange={e => setEditModal(p => ({ ...p, correct_option: e.target.value }))}>
+                      {['A','B','C','D'].map(o => <option key={o} value={o}>{LAO[o]} ({o})</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+              
+              <div className="md-field"><label>{editModal.qType === 'subj' ? 'ຄຳຕອບ' : 'ຄຳອະທິບາຍ'}</label><textarea className="md-textarea" rows="2" value={editModal.explanation || ''} onChange={e => setEditModal(p => ({ ...p, explanation: e.target.value }))} /></div>
             </div>
             <div className="dialog-actions">
               <button className="md-btn-text" onClick={() => setEditModal(null)}>ຍົກເລີກ</button>
               <button className="md-btn-text" onClick={() => {
-                const d = { question_text: editModal.question_text, option_a: editModal.option_a, option_b: editModal.option_b, option_c: editModal.option_c, option_d: editModal.option_d, correct_option: editModal.correct_option, explanation: editModal.explanation };
+                let d = { question_text: editModal.question_text, explanation: editModal.explanation };
+                if (editModal.qType === 'subj') {
+                  d = { ...d, option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'A' };
+                } else {
+                  d = { ...d, option_a: editModal.option_a, option_b: editModal.option_b, option_c: editModal.option_c, option_d: editModal.option_d, correct_option: editModal.correct_option };
+                }
                 editModal.mode === 'add' ? addQ(d) : updateQ(editModal.id, d);
               }}>ບັນທຶກ</button>
             </div>
@@ -1062,6 +1129,82 @@ export default function App() {
               >
                 ຕົກລົງ
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ PROFILE DIALOG ═══ */}
+      {profileOpen && (
+        <div className="dialog-scrim" onClick={() => setProfileOpen(false)}>
+          <div className="dialog-card animate-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+            <div className="dialog-header">ຕັ້ງຄ່າບັນຊີ (Profile)</div>
+            <div className="dialog-body" style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              
+              {/* Profile Pic Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <div style={{ position: 'relative', width: 80, height: 80, borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--md-outline-variant)' }}>
+                  {user.profile_pic ? (
+                    <img src={user.profile_pic} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', background: 'var(--md-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 'bold' }}>
+                      {user.username.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                {!user.isGuest && (
+                  <div>
+                    <input type="file" id="pfp-upload" accept="image/png, image/jpeg" style={{ display: 'none' }} onChange={async (e) => {
+                      const file = e.target.files[0];
+                      if (!file) return;
+                      const fd = new FormData(); fd.append('file', file);
+                      try {
+                        const r = await api.postForm('/api/user/profile-pic', fd);
+                        const d = await r.json();
+                        if (r.ok) {
+                          setUser(prev => ({ ...prev, profile_pic: d.profile_pic }));
+                          show('ອັບເດດຮູບໂປຣໄຟລ໌ສຳເລັດ');
+                        } else showAlert(d.error);
+                      } catch { showAlert('ເກີດຂໍ້ຜິດພາດໃນການອັບໂຫລດຮູບ'); }
+                    }} />
+                    <label htmlFor="pfp-upload" className="md-btn-text" style={{ cursor: 'pointer', display: 'inline-block', margin: 0 }}>
+                      ອັບໂຫລດຮູບໃໝ່
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* Delete Account Section */}
+              {!user.isGuest && (
+                <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: '16px' }}>
+                  <h4 style={{ margin: '0 0 12px 0', fontSize: 14, color: 'var(--md-error)' }}>ລົບບັນຊີຖາວອນ (Danger Zone)</h4>
+                  <button 
+                    className="md-btn-text" 
+                    style={{ color: 'var(--md-error)', width: '100%', border: '1px solid var(--md-error)' }}
+                    onClick={() => {
+                      showConfirm('ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການລົບບັນຊີນີ້? ຂໍ້ມູນທັງໝົດຈະຖືກລຶບ ແລະ ບໍ່ສາມາດກູ້ຄືນໄດ້!', async () => {
+                        try {
+                          const r = await api.del('/api/user/account');
+                          if (r.ok) {
+                            handleLogout();
+                            show('ລົບບັນຊີສຳເລັດ');
+                            setProfileOpen(false);
+                          } else {
+                            const d = await r.json();
+                            showAlert(d.error);
+                          }
+                        } catch { showAlert('ເກີດຂໍ້ຜິດພາດ'); }
+                      });
+                    }}
+                  >
+                    ລົບບັນຊີຂອງຂ້ອຍ
+                  </button>
+                </div>
+              )}
+
+            </div>
+            <div className="dialog-actions" style={{ padding: '8px 24px 24px' }}>
+              <button className="md-btn-text" onClick={() => setProfileOpen(false)}>ປິດ</button>
             </div>
           </div>
         </div>

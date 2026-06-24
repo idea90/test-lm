@@ -72,6 +72,10 @@ def _build_prompt(context_text, num_questions, difficulty_lao, question_type, cu
        * Options 'option_a', 'option_b', 'option_c', and 'option_d' MUST all be empty strings ("").
        * The correct expected model answer MUST be provided inside the 'explanation' field.
        * 'correct_option' should be set to 'A' (as a placeholder)."""
+    elif question_type == 'mixed':
+        format_instructions = """5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
+       * Roughly half of the questions should be Multiple Choice (options A, B, C, D are provided, and correct_option is one of A, B, C, or D).
+       * The other half of the questions should be Short Answer/Essay questions (options option_a, option_b, option_c, and option_d are ALL empty strings "", and the correct answer description is placed in the explanation field)."""
     else:
         format_instructions = f"5. Format: Standard multiple choice. {options_instruction} Ensure there is only one correct answer."
 

@@ -88,11 +88,13 @@ def login():
         session['user_id'] = user['id']
         session['username'] = user['username']
         session['is_guest'] = (user['username'] == 'guest')
+        profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={user['username']}&background=random"
         return jsonify({
             "message": "ເຂົ້າລະບົບສຳເລັດ", 
             "user_id": user['id'], 
             "username": user['username'], 
-            "is_guest": session['is_guest']
+            "is_guest": session['is_guest'],
+            "profile_pic": profile_pic
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -134,14 +136,58 @@ def logout():
 @app.route('/api/auth/me', methods=['GET'])
 def get_current_user():
     if 'user_id' in session:
+        user = database.get_user_by_id(session['user_id'])
+        profile_pic = None
+        if user:
+            profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={session['username']}&background=random"
         return jsonify({
             "logged_in": True,
             "user_id": session['user_id'],
             "username": session['username'],
-            "is_guest": session.get('is_guest', False)
+            "is_guest": session.get('is_guest', False),
+            "profile_pic": profile_pic
         })
     return jsonify({"logged_in": False})
 
+UPLOAD_AVATAR_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'avatars')
+os.makedirs(UPLOAD_AVATAR_FOLDER, exist_ok=True)
+app.config['UPLOAD_AVATAR_FOLDER'] = UPLOAD_AVATAR_FOLDER
+
+@app.route('/uploads/avatars/<path:filename>')
+def uploaded_avatar(filename):
+    return send_from_directory(app.config['UPLOAD_AVATAR_FOLDER'], filename)
+
+@app.route('/api/user/profile-pic', methods=['POST'])
+@login_required
+def upload_profile_pic():
+    if session.get('is_guest'): return jsonify({"error": "ບັນຊີ Guest ບໍ່ສາມາດປ່ຽນຮູບໂປຣໄຟລ໌ໄດ້"}), 403
+    if 'file' not in request.files: return jsonify({"error": "ບໍ່ພົບໄຟລ໌"}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({"error": "ບໍ່ໄດ້ເລືອກໄຟລ໌"}), 400
+    
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.jpg', '.jpeg', '.png']: return jsonify({"error": "ຮອງຮັບສະເພາະຮູບພາບ (JPG, PNG)"}), 400
+    
+    import uuid
+    filename = f"{session['user_id']}_{uuid.uuid4().hex}{ext}"
+    filepath = os.path.join(app.config['UPLOAD_AVATAR_FOLDER'], filename)
+    file.save(filepath)
+    
+    pic_url = f"/uploads/avatars/{filename}"
+    database.update_user_profile_pic(session['user_id'], pic_url)
+    return jsonify({"message": "ອັບເດດຮູບໂປຣໄຟລ໌ສຳເລັດ", "profile_pic": pic_url})
+
+@app.route('/api/user/account', methods=['DELETE'])
+@login_required
+def delete_account():
+    if session.get('is_guest'):
+        return jsonify({"error": "ບັນຊີ Guest ບໍ່ສາມາດລົບບັນຊີໄດ້"}), 403
+    try:
+        database.delete_user_account(session['user_id'])
+        session.clear()
+        return jsonify({"message": "ລົບບັນຊີສຳເລັດ"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 # Helper function to extract text from PDF
 def extract_text_from_pdf(file_stream, page_start=1, page_end=None):
     try:
@@ -682,21 +728,54 @@ def generate_docx_file(test_data):
     
     lao_options = {'A': 'ກ', 'B': 'ຂ', 'C': 'ຄ', 'D': 'ງ'}
     
-    # Questions loop
-    for i, q in enumerate(test_data['questions'], 1):
-        qp = doc.add_paragraph()
-        q_run = qp.add_run(f"ຂໍ້ {i}. {q['question_text']}")
-        q_run.bold = True
+    # Questions loop - Partition into Objective and Subjective
+    objective_qs = [q for q in test_data['questions'] if not (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')]
+    subjective_qs = [q for q in test_data['questions'] if (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')]
+
+    # Section I: Objective Part
+    if objective_qs:
+        sec1_p = doc.add_paragraph()
+        sec1_run = sec1_p.add_run("I. ພາກປາລະໄນ (ຄຳຖາມເລືອກຕອບ)")
+        sec1_run.bold = True
+        sec1_run.font.size = Pt(13)
+        doc.add_paragraph() # space
         
-        # Options
-        for opt_key, opt_val in [('A', q['option_a']), ('B', q['option_b']), ('C', q['option_c']), ('D', q['option_d'])]:
-            op = doc.add_paragraph()
-            op.paragraph_format.left_indent = Inches(0.4)
-            op.paragraph_format.space_after = Pt(2)
-            opt_lao = lao_options[opt_key]
-            op.add_run(f"{opt_lao}. {opt_val}")
+        for idx, q in enumerate(objective_qs, 1):
+            qp = doc.add_paragraph()
+            q_run = qp.add_run(f"ຂໍ້ {idx}. {q['question_text']}")
+            q_run.bold = True
             
-        doc.add_paragraph() # spacing
+            # Options
+            for opt_key, opt_val in [('A', q['option_a']), ('B', q['option_b']), ('C', q['option_c']), ('D', q['option_d'])]:
+                if opt_val.strip() != '':
+                    op = doc.add_paragraph()
+                    op.paragraph_format.left_indent = Inches(0.4)
+                    op.paragraph_format.space_after = Pt(2)
+                    opt_lao = lao_options[opt_key]
+                    op.add_run(f"{opt_lao}. {opt_val}")
+            doc.add_paragraph() # spacing
+
+    # Section II: Subjective Part
+    if subjective_qs:
+        sec2_p = doc.add_paragraph()
+        sec2_run = sec2_p.add_run("II. ພາກອັດຕະໄນ (ຄຳຖາມອະທິບາຍ/ຕອບສັ້ນ)")
+        sec2_run.bold = True
+        sec2_run.font.size = Pt(13)
+        doc.add_paragraph() # space
+        
+        for idx, q in enumerate(subjective_qs, 1):
+            qp = doc.add_paragraph()
+            start_num = len(objective_qs) + idx if objective_qs else idx
+            q_run = qp.add_run(f"ຂໍ້ {start_num}. {q['question_text']}")
+            q_run.bold = True
+            
+            # Add 3 rows of dotted lines
+            for _ in range(3):
+                op = doc.add_paragraph()
+                op.paragraph_format.left_indent = Inches(0.4)
+                op.paragraph_format.space_after = Pt(2)
+                op.add_run("....................................................................................................................................................")
+            doc.add_paragraph() # spacing
         
     # Answer Key Page Break
     doc.add_page_break()
@@ -710,21 +789,27 @@ def generate_docx_file(test_data):
     
     for i, q in enumerate(test_data['questions'], 1):
         kp = doc.add_paragraph()
-        correct_lao = lao_options.get(q['correct_option'], q['correct_option'])
+        is_subjective = (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')
         
-        k_run1 = kp.add_run(f"ຂໍ້ {i}. ຕອບ: ")
-        k_run2 = kp.add_run(f"{correct_lao}")
-        k_run2.bold = True
-        
-        # Add actual text of the correct option
-        opt_field = f"option_{q['correct_option'].lower()}"
-        correct_text = q.get(opt_field, '')
-        kp.add_run(f" ({correct_text})\n")
-        
-        explanation_text = q.get('explanation') or 'ບໍ່ມີຄຳອະທິບາຍ'
-        k_run3 = kp.add_run(f"ອະທິບາຍ: {explanation_text}")
-        k_run3.font.size = Pt(10.5)
-        k_run3.italic = True
+        if is_subjective:
+            k_run1 = kp.add_run(f"ຂໍ້ {i}. ແນວທາງຄຳຕອບ: ")
+            k_run2 = kp.add_run(q.get('explanation') or 'ບໍ່ມີແນວທາງຄຳຕອບ')
+            k_run2.bold = True
+        else:
+            correct_lao = lao_options.get(q['correct_option'], q['correct_option'])
+            k_run1 = kp.add_run(f"ຂໍ້ {i}. ຕອບ: ")
+            k_run2 = kp.add_run(f"{correct_lao}")
+            k_run2.bold = True
+            
+            # Add actual text of the correct option
+            opt_field = f"option_{q['correct_option'].lower()}"
+            correct_text = q.get(opt_field, '')
+            kp.add_run(f" ({correct_text})\n")
+            
+            explanation_text = q.get('explanation') or 'ບໍ່ມີຄຳອະທິບາຍ'
+            k_run3 = kp.add_run(f"ອະທິບາຍ: {explanation_text}")
+            k_run3.font.size = Pt(10.5)
+            k_run3.italic = True
         
         doc.add_paragraph()
         

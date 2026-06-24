@@ -1152,6 +1152,16 @@ input[type="range"]::-webkit-slider-thumb {
   .center-area { border-radius: 0; }
 }
 
+/* ═══ Dotted Lines for Subjective Questions ═══ */
+.exam-dotted-lines {
+  margin: 16px 0 8px 24px;
+}
+.dotted-line {
+  border-bottom: 2px dotted var(--md-outline-variant);
+  height: 28px;
+  width: 100%;
+}
+
 /* ═══ Print ═══ */
 @media print {
   body { background: white; }

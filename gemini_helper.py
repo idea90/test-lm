@@ -114,6 +114,8 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
         error_msg = str(e)
         if "API_KEY" in error_msg.upper() or "400" in error_msg:
             raise ValueError("API Key ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ມີສິດເຂົ້າເຖິງ (Gemini API Error).")
+        if "503" in error_msg or "UNAVAILABLE" in error_msg.upper() or "high demand" in error_msg.lower():
+            raise ValueError("ເກີດຂໍ້ຜິດພາດຈາກ Gemini API (503): ປັດຈຸບັນລະບົບມີຜູ້ໃຊ້ງານຈຳນວນຫຼາຍ (High Demand). ກະລຸນາລອງໃໝ່ອີກຄັ້ງໃນພາຍຫຼັງ.")
         raise ValueError(f"ເກີດຂໍ້ຜິດພາດຈາກ Gemini API: {error_msg}")
     
     try:
@@ -179,4 +181,6 @@ def generate_chat_response(chat_history, new_message, context_text, api_key=None
         error_msg = str(e)
         if "API_KEY" in error_msg.upper() or "400" in error_msg:
             raise ValueError("API Key ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ມີສິດເຂົ້າເຖິງ (Gemini API Error).")
+        if "503" in error_msg or "UNAVAILABLE" in error_msg.upper() or "high demand" in error_msg.lower():
+            raise ValueError("ເກີດຂໍ້ຜິດພາດຈາກ Gemini API (503): ປັດຈຸບັນລະບົບມີຜູ້ໃຊ້ງານຈຳນວນຫຼາຍ (High Demand). ກະລຸນາລອງໃໝ່ອີກຄັ້ງໃນພາຍຫຼັງ.")
         raise ValueError(f"ເກີດຂໍ້ຜິດພາດຈາກ Gemini API: {error_msg}")
