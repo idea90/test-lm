@@ -520,64 +520,48 @@ body {
   position: relative;
 }
 
-.exam-paper-header {
-  text-align: center;
-  border-bottom: 2px solid #1D1B20;
-  padding-bottom: 16px;
+.exam-paper-header-official {
   margin-bottom: 24px;
 }
+.lao-motto {
+  text-align: center; font-size: 14px; margin-bottom: 24px; line-height: 1.4;
+  font-family: 'Times New Roman', serif;
+}
+.school-row, .subject-time-row {
+  display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;
+}
+.title-row {
+  text-align: center; font-size: 18px; margin-bottom: 16px; margin-top: 16px;
+}
+.inline-input {
+  border: none; border-bottom: 1px dotted #999; background: transparent;
+  font-family: inherit; font-size: inherit; color: inherit; outline: none; padding: 2px 4px;
+  display: inline-block; vertical-align: baseline;
+  transition: border-color 0.15s, background 0.15s;
+}
+.inline-input:hover { border-bottom-color: #555; background: rgba(0,0,0,0.03); border-radius: 3px; }
+.inline-input:focus { border-bottom-color: var(--md-primary); background: rgba(103,80,164,0.05); border-radius: 3px; }
+textarea.inline-input { display: block; width: 100%; border-bottom: none; border: 1px solid transparent; border-radius: 4px; line-height: 1.5; }
+textarea.inline-input:hover { border: 1px solid #bbb; background: rgba(0,0,0,0.02); }
+textarea.inline-input:focus { border: 1px solid var(--md-primary); background: rgba(103,80,164,0.04); }
+.student-info-table {
+  width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;
+}
+.student-info-table td {
+  border: 1px solid var(--md-outline-variant); padding: 8px; vertical-align: top;
+}
+.student-details-cell { width: 45%; line-height: 1.8; }
+.score-cell { width: 15%; text-align: center; }
+.teacher-comment-cell { width: 20%; text-align: center; }
+.teacher-sign-cell { width: 20%; text-align: center; }
+.cell-title { text-align: center; margin-bottom: 40px; }
 
-.exam-school-input, .exam-subject-input {
-  width: 100%;
-  text-align: center;
-  border: none;
-  outline: none;
-  font-family: var(--font);
-  background: transparent;
-  color: #1D1B20;
-  transition: var(--motion-std);
-  border-radius: var(--shape-xs);
-  padding: 4px 8px;
-}
-.exam-school-input:hover, .exam-subject-input:hover,
-.exam-school-input:focus, .exam-subject-input:focus {
-  background: var(--md-primary-container);
-}
-
-.exam-school-input {
-  font-size: 16px;
-  font-weight: 700;
-}
-.exam-subject {
-  font-size: 14px;
-  font-weight: 500;
-  margin-top: 4px;
-  display: none;
-}
-.exam-subject-input {
-  font-size: 13px;
-  font-weight: 500;
-  margin-top: 4px;
-}
-
-.exam-student-row {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--md-outline-variant);
-  font-size: 12px;
+.exam-instructions-official {
+  font-size: 14px; margin-bottom: 28px;
 }
 
-.exam-instructions {
-  font-size: 12px;
-  font-weight: 500;
-  border-left: 3px solid var(--md-primary);
-  padding: 8px 14px;
-  margin-bottom: 28px;
-  background: var(--md-surface-container-low);
-  border-radius: 0 var(--shape-xs) var(--shape-xs) 0;
-  color: var(--md-on-surface-variant);
+.exam-options-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-left: 20px; margin-top: 8px;
 }
 
 .exam-question {

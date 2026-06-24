@@ -212,6 +212,13 @@ export default function App() {
 
   const [previewSchool, setPreviewSchool] = useState('ໂຮງຮຽນ ມັດທະຍົມສົມບູນ...');
   const [previewSubject, setPreviewSubject] = useState('ວິຊາ: ບົດຮຽນທົ່ວໄປ');
+  const [previewMotto, setPreviewMotto] = useState('ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ\nສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນາຖາວອນ\n------000-------');
+  const [previewExamNo, setPreviewExamNo] = useState('........');
+  const [previewTitle, setPreviewTitle] = useState('');
+  const [previewTime, setPreviewTime] = useState('90');
+  const [previewSection, setPreviewSection] = useState('I. ພາກປາລະໄນ');
+  const [previewInstructions, setPreviewInstructions] = useState('ຈົ່ງເລືອກເອົາຂໍ້ທີ່ຖືກຕ້ອງທີ່ສຸດພຽງຂໍ້ດຽວຈາກຄຳຖາມລຸ່ມນີ້:');
+  const [previewTotalScore, setPreviewTotalScore] = useState(10);
 
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
   useEffect(() => {
@@ -241,7 +248,7 @@ export default function App() {
       const d = await r.json();
       if (r.ok && d.logged_in) {
         setUser({ username: d.username, isGuest: d.is_guest });
-        loadSources(); loadStats();
+        loadSources(); loadStats(); restoreLastTest();
       }
     } catch (e) { console.error(e); }
   };
@@ -255,7 +262,7 @@ export default function App() {
       if (r.ok) {
         setUser({ username: d.username, isGuest: d.is_guest || false });
         setAuthForm({ username: '', password: '' });
-        loadSources(); loadStats();
+        loadSources(); loadStats(); restoreLastTest();
         show(authMode === 'login' ? 'ເຂົ້າລະບົບສຳເລັດ' : 'ລົງທະບຽນສຳເລັດ');
       } else showAlert(d.error);
     } catch { showAlert('ເກີດຂໍ້ຜິດພາດ'); }
@@ -271,12 +278,32 @@ export default function App() {
 
   const handleLogout = async () => {
     await api.post('/api/auth/logout', {});
+    localStorage.removeItem('last_test_id');
     setUser(null); setSources([]); setStats(null); setActiveTest(null); setSelSrcId(null);
   };
 
   // ─── Data ───
   const loadSources = async () => { try { const r = await api.get('/api/sources'); if (r.ok) setSources(await r.json()); } catch {} };
   const loadStats = async () => { try { const r = await api.get('/api/dashboard/stats'); if (r.ok) setStats(await r.json()); } catch {} };
+
+  const loadTest = async (testId) => {
+    try {
+      const r = await api.get(`/api/tests/${testId}`);
+      if (r.ok) {
+        const t = await r.json();
+        setActiveTest(t);
+        setPreviewTitle(t.title);
+        localStorage.setItem('last_test_id', testId);
+        setView('test');
+      }
+    } catch {}
+  };
+
+  // Restore last active test after login
+  const restoreLastTest = async () => {
+    const lastId = localStorage.getItem('last_test_id');
+    if (lastId) await loadTest(parseInt(lastId));
+  };
 
   const handleUpload = async (file) => {
     if (!file?.name.toLowerCase().endsWith('.pdf')) { showAlert('PDF ເທົ່ານັ້ນ'); return; }
@@ -301,16 +328,6 @@ export default function App() {
   // ─── Quiz ───
   const generateTest = async () => {
     if (!selSrcId) { show('ເລືອກ PDF ກ່ອນ'); return; }
-    
-    if (stats) {
-      if (stats.total_tokens_used >= stats.token_limit) {
-        showAlert('ໂຄຕ້າການນຳໃຊ້ AI ຂອງທ່ານໝົດແລ້ວ (Limit Reached)');
-        return;
-      }
-      if (stats.total_tokens_used / stats.token_limit >= 0.9) {
-        show('ຄຳເຕືອນ: ໂຄຕ້າ AI ຂອງທ່ານໃກ້ໝົດແລ້ວ!');
-      }
-    }
     
     setGenLoading(true); setConfigOpen(false);
     try {
@@ -353,21 +370,68 @@ export default function App() {
     if (!activeTest) return;
     showConfirm('ຕ້ອງການປ່ຽນເປັນເອກະສານທົ່ວໄປບໍ? (ຈະບໍ່ສາມາດສັບປ່ຽນຂໍ້ສອບ ຫຼື ສ້າງຄຳຕອບອັດຕະໂນມັດໄດ້ອີກ)', async () => {
       const html = `
-        <div style="text-align: center; font-weight: bold; font-size: 1.5em; margin-bottom: 8px;">${activeTest.title}</div>
-        <div style="text-align: center; font-style: italic; margin-bottom: 24px;">ຈຳນວນ: ${activeTest.questions.length} ຂໍ້</div>
-        <div style="display:flex; justify-content: space-between; margin-bottom: 24px;">
-           <span>ຊື່: .........................</span>
-           <span>ຫ້ອງ: ............</span>
-           <span>ວັນທີ: .../.../....</span>
+        <div style="text-align: center; font-size: 14px; margin-bottom: 24px; line-height: 1.4; font-family: 'Times New Roman', serif;">
+          ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ<br/>
+          ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນາຖາວອນ<br/>
+          ------000-------
         </div>
-        <div style="margin-bottom: 24px;">ຄຳຊີ້ແຈງ: ເລືອກຄຳຕອບທີ່ຖືກຕ້ອງທີ່ສຸດ ໂດຍໝາຍ (X) ໃສ່ ກ, ຂ, ຄ ຫຼື ງ.</div>
+        <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;">
+          <div style="flex: 1;">ໂຮງຮຽນ: ${previewSchool}</div>
+          <div>ເລກທີ: ........</div>
+        </div>
+        <div style="text-align: center; font-size: 18px; margin-bottom: 16px; margin-top: 16px; font-weight: bold;">
+          ຫົວບົດສອບເສັງ: ${activeTest.title}
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;">
+          <div style="flex: 1;">ວິຊາ: ${previewSubject}</div>
+          <div>ເວລາ: 90 ນາທີ</div>
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;">
+          <tbody>
+            <tr>
+              <td style="border: 1px solid #49454F; padding: 8px; vertical-align: top; width: 45%; line-height: 1.8;">
+                <div>ຊື່ ແລະ ນາມສະກຸນ: ....................................................</div>
+                <div>ຫ້ອງ: ....................................................</div>
+                <div>ວັນທີ: ....................................................</div>
+                <div>ເລກໂຕະ: ....................................................</div>
+              </td>
+              <td style="border: 1px solid #49454F; padding: 8px; vertical-align: top; width: 15%; text-align: center;">
+                <div style="margin-bottom: 40px;">ຄະແນນ</div>
+              </td>
+              <td style="border: 1px solid #49454F; padding: 8px; vertical-align: top; width: 20%; text-align: center;">
+                <div style="margin-bottom: 40px;">ຄຳເຫັນຂອງຄູ</div>
+              </td>
+              <td style="border: 1px solid #49454F; padding: 8px; vertical-align: top; width: 20%; text-align: center;">
+                <div style="margin-bottom: 40px;">ລາຍເຊັນຄູອາຈານ</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div style="font-size: 14px; margin-bottom: 28px;">
+          <div style="display: flex; justify-content: space-between; font-weight: bold;">
+            <span>I. ພາກປາລະໄນ</span>
+            <span>ຄະແນນພາກປາລະໄນ ....................</span>
+          </div>
+          <div style="margin-top: 8px;">
+            ຈົ່ງເລືອກເອົາຂໍ້ທີ່ຖືກຕ້ອງທີ່ສຸດພຽງຂໍ້ດຽວຈາກຄຳຖາມລຸ່ມນີ້: (ຂໍ້ລະ ${(10/activeTest.questions.length).toFixed(2)})
+          </div>
+        </div>
+
         ${activeTest.questions.map((q, i) => `
           <div style="margin-bottom: 16px;">
             <div style="font-weight: bold; margin-bottom: 8px;">ຂໍ້ ${i+1}. ${q.question_text}</div>
-            <div style="margin-left: 20px; margin-bottom: 4px;">ກ. ${q.option_a}</div>
-            <div style="margin-left: 20px; margin-bottom: 4px;">ຂ. ${q.option_b}</div>
-            <div style="margin-left: 20px; margin-bottom: 4px;">ຄ. ${q.option_c}</div>
-            <div style="margin-left: 20px; margin-bottom: 4px;">ງ. ${q.option_d}</div>
+            <table style="width: 100%; border: none; margin-left: 20px;">
+              <tr>
+                <td style="width: 50%; padding-bottom: 4px;">ກ. ${q.option_a}</td>
+                <td style="width: 50%; padding-bottom: 4px;">ຂ. ${q.option_b}</td>
+              </tr>
+              <tr>
+                <td style="width: 50%;">ຄ. ${q.option_c}</td>
+                <td style="width: 50%;">ງ. ${q.option_d}</td>
+              </tr>
+            </table>
           </div>
         `).join('')}
       `;
@@ -578,45 +642,143 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="exam-paper">
-                  <div className="exam-paper-header">
-                    <input className="exam-school-input" value={previewSchool} onChange={e => setPreviewSchool(e.target.value)} />
-                    <div className="exam-subject">ບົດສອບເສັງ {previewSubject}</div>
-                    <input className="exam-subject-input" value={previewSubject} onChange={e => setPreviewSubject(e.target.value)} />
-                    <div className="exam-student-row">
-                      <span>ຊື່: .........................</span>
-                      <span>ຫ້ອງ: ............</span>
-                      <span>ວັນທີ: .../.../....</span>
-                    </div>
-                  </div>
+                    <div className="exam-paper-header-official">
 
-                  <div className="exam-instructions">
-                    ຄຳຊີ້ແຈງ: ເລືອກຄຳຕອບທີ່ຖືກຕ້ອງທີ່ສຸດ ໂດຍໝາຍ (X) ໃສ່ ກ, ຂ, ຄ ຫຼື ງ.
-                  </div>
+                      {/* Editable Motto */}
+                      <div className="lao-motto">
+                        <textarea
+                          className="inline-input"
+                          value={previewMotto}
+                          onChange={e => setPreviewMotto(e.target.value)}
+                          rows={3}
+                          style={{ width: '100%', textAlign: 'center', resize: 'none', fontSize: '14px', fontFamily: "'Times New Roman', serif", lineHeight: 1.4 }}
+                        />
+                      </div>
 
-                  {activeTest.questions.map((q, i) => (
-                    <div key={q.id} className="exam-question">
-                      <div className="exam-q-row">
-                        <p className="exam-q-text"><strong>ຂໍ້ {i + 1}.</strong> {q.question_text}</p>
-                        <div className="exam-q-actions">
-                          <button className="icon-btn sm" onClick={() => setEditModal({ mode: 'edit', id: q.id, ...q })}><I name="edit" size={13} /></button>
-                          <button className="icon-btn sm" onClick={() => deleteQ(q.id)}><I name="trash" size={13} /></button>
+                      {/* School row */}
+                      <div className="school-row">
+                        <div style={{ flex: 1 }}>ໂຮງຮຽນ: <input className="inline-input" value={previewSchool} onChange={e => setPreviewSchool(e.target.value)} style={{ width: '180px' }} /></div>
+                        <div>ເລກທີ: <input className="inline-input" value={previewExamNo} onChange={e => setPreviewExamNo(e.target.value)} style={{ width: '80px' }} /></div>
+                      </div>
+
+                      {/* Title */}
+                      <div className="title-row">
+                        <strong>ຫົວບົດສອບເສັງ: <input
+                          className="inline-input"
+                          style={{ width: '300px', fontWeight: 'bold', fontSize: '16px' }}
+                          value={previewTitle || activeTest.title}
+                          onChange={e => setPreviewTitle(e.target.value)}
+                        /></strong>
+                      </div>
+
+                      {/* Subject & Time */}
+                      <div className="subject-time-row">
+                        <div style={{ flex: 1 }}>ວິຊາ: <input className="inline-input" value={previewSubject} onChange={e => setPreviewSubject(e.target.value)} style={{ width: '180px' }} /></div>
+                        <div>ເວລາ: <input className="inline-input" value={previewTime} onChange={e => setPreviewTime(e.target.value)} style={{ width: '50px', textAlign: 'center' }} /> ນາທີ</div>
+                      </div>
+
+                      {/* Student table — labels editable */}
+                      <table className="student-info-table">
+                        <tbody>
+                          <tr>
+                            <td className="student-details-cell">
+                              <div>ຊື່ ແລະ ນາມສະກຸນ: ....................................................</div>
+                              <div>ຫ້ອງ: ....................................................</div>
+                              <div>ວັນທີ: ....................................................</div>
+                              <div>ເລກໂຕະ: ....................................................</div>
+                            </td>
+                            <td className="score-cell"><div className="cell-title">ຄະແນນ</div></td>
+                            <td className="teacher-comment-cell"><div className="cell-title">ຄຳເຫັນຂອງຄູ</div></td>
+                            <td className="teacher-sign-cell"><div className="cell-title">ລາຍເຊັນຄູອາຈານ</div></td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* Section label & instructions */}
+                      <div className="exam-instructions-official">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', alignItems: 'center' }}>
+                          <input
+                            className="inline-input"
+                            value={previewSection}
+                            onChange={e => setPreviewSection(e.target.value)}
+                            style={{ fontWeight: 'bold', width: '200px' }}
+                          />
+                          <span>ຄະແນນພາກປາລະໄນ: <input
+                            className="inline-input"
+                            type="number"
+                            value={previewTotalScore}
+                            onChange={e => setPreviewTotalScore(Number(e.target.value) || 0)}
+                            style={{ width: '50px', textAlign: 'center', fontWeight: 'bold' }}
+                          /> ຂໍ້</span>
+                        </div>
+                        <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                          <textarea
+                            className="inline-input"
+                            value={previewInstructions}
+                            onChange={e => setPreviewInstructions(e.target.value)}
+                            rows={2}
+                            style={{ flex: 1, resize: 'none', fontSize: '14px' }}
+                          />
+                          <span style={{ whiteSpace: 'nowrap' }}>(ຂໍ້ລະ <input
+                            className="inline-input"
+                            type="number"
+                            value={(previewTotalScore / activeTest.questions.length).toFixed(2)}
+                            onChange={e => setPreviewTotalScore((Number(e.target.value) || 0) * activeTest.questions.length)}
+                            style={{ width: '45px', textAlign: 'center' }}
+                          />)</span>
                         </div>
                       </div>
-                      <div className="exam-options">
-                        {['A','B','C','D'].map(o => (
-                          <div key={o} className={`exam-opt ${showExp && q.correct_option === o ? 'correct' : ''}`}>
-                            {LAO[o]}. {q[`option_${o.toLowerCase()}`]}
+                    </div>
+
+                    {/* Questions — all inline editable */}
+                    {activeTest.questions.map((q, i) => (
+                      <div key={q.id} className="exam-question">
+                        <div className="exam-q-row">
+                          <div style={{ display: 'flex', alignItems: 'flex-start', flex: 1, gap: 6 }}>
+                            <strong style={{ whiteSpace: 'nowrap', paddingTop: 2 }}>ຂໍ້ {i + 1}.</strong>
+                            <textarea
+                              className="inline-input"
+                              defaultValue={q.question_text}
+                              rows={2}
+                              style={{ flex: 1, resize: 'none', fontSize: '14px', fontWeight: 500 }}
+                              onBlur={async e => {
+                                const updated = { ...q, question_text: e.target.value };
+                                setActiveTest(p => ({ ...p, questions: p.questions.map(x => x.id === q.id ? updated : x) }));
+                                await api.put(`/api/questions/${q.id}`, updated);
+                              }}
+                            />
                           </div>
-                        ))}
-                      </div>
-                      {showExp && (
-                        <div className="exam-answer">
-                          <I name="check" size={13} /> ຄຳຕອບ: <strong>{LAO[q.correct_option]}</strong> — {q.explanation || '—'}
+                          <div className="exam-q-actions">
+                            <button className="icon-btn sm" onClick={() => setEditModal({ mode: 'edit', id: q.id, ...q })}><I name="edit" size={13} /></button>
+                            <button className="icon-btn sm" onClick={() => deleteQ(q.id)}><I name="trash" size={13} /></button>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        <div className="exam-options-grid">
+                          {['A','B','C','D'].map(o => (
+                            <div key={o} className={`exam-opt ${showExp && q.correct_option === o ? 'correct' : ''}`} style={{ display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+                              <span style={{ whiteSpace: 'nowrap', paddingTop: 2 }}>{LAO[o]}.</span>
+                              <textarea
+                                className="inline-input"
+                                defaultValue={q[`option_${o.toLowerCase()}`]}
+                                rows={1}
+                                style={{ flex: 1, resize: 'none', fontSize: '13px' }}
+                                onBlur={async e => {
+                                  const updated = { ...q, [`option_${o.toLowerCase()}`]: e.target.value };
+                                  setActiveTest(p => ({ ...p, questions: p.questions.map(x => x.id === q.id ? updated : x) }));
+                                  await api.put(`/api/questions/${q.id}`, updated);
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        {showExp && (
+                          <div className="exam-answer">
+                            <I name="check" size={13} /> ຄຳຕອບ: <strong>{LAO[q.correct_option]}</strong> — {q.explanation || '—'}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             ) : (
@@ -640,7 +802,6 @@ export default function App() {
             <div className="animate-up" style={{ maxWidth: 640, margin: '24px auto', padding: '0 16px' }}>
               <div className="dash-grid">
                 {[
-                  { icon: 'wand', color: 'blue', label: 'Tokens (Usage)', val: `${(stats.total_tokens_used || 0).toLocaleString()} / ${(stats.token_limit || 0).toLocaleString()}` },
                   { icon: 'file', color: 'purple', label: 'ເອກະສານ', val: stats.total_sources },
                   { icon: 'zap', color: 'pink', label: 'ຊຸດຂໍ້ສອບ', val: stats.total_tests },
                   { icon: 'check', color: 'green', label: 'ຄຳຖາມ', val: stats.total_questions },
@@ -655,7 +816,7 @@ export default function App() {
               <div className="recent-card">
                 <div className="recent-card-header">ບົດສອບເສັງຫຼ້າສຸດ</div>
                 {stats.recent_tests?.length > 0 ? stats.recent_tests.map((t, i) => (
-                  <div key={i} className="recent-row">
+                  <div key={i} className="recent-row" onClick={() => loadTest(t.id)} style={{ cursor: 'pointer' }}>
                     <div className="recent-row-info">
                       <div className="recent-row-icon"><I name="zap" size={14} /></div>
                       <div>
@@ -663,9 +824,10 @@ export default function App() {
                         <div className="recent-row-sub">{t.source_filename || '—'}</div>
                       </div>
                     </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span className={`md-chip ${t.difficulty}`}>{{ easy: 'ງ່າຍ', medium: 'ປານກາງ', hard: 'ຍາກ' }[t.difficulty]}</span>
                       <span className="md-chip" style={{ background: 'var(--md-secondary-container)', color: 'var(--md-on-secondary-container)' }}>{t.num_questions} ຂໍ້</span>
+                      <I name="arrowRight" size={14} style={{ color: 'var(--md-outline)' }} />
                     </div>
                   </div>
                 )) : <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--md-outline)' }}>ຍັງບໍ່ມີ</div>}

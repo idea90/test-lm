@@ -349,8 +349,6 @@ def generate_test():
             return jsonify({"error": "ບໍ່ພົບບົດຮຽນທີ່ເລືອກ"}), 404
             
         user_stats = database.get_dashboard_stats(session['user_id'])
-        if user_stats['total_tokens_used'] >= user_stats['token_limit']:
-            return jsonify({"error": "ໂຄຕ້າການນຳໃຊ້ AI ຂອງທ່ານໝົດແລ້ວ (Limit Reached)"}), 429
             
         # Generate questions via LLM
         gemini_response, token_count = llm_helper.generate_test_questions(
@@ -364,7 +362,6 @@ def generate_test():
             language=language,
             api_keys=api_keys
         )
-        database.increment_token_usage(session['user_id'], token_count)
         
         # Shuffle options if requested
         if shuffle_options and question_type == 'multiple_choice':
@@ -493,8 +490,6 @@ def chat_with_source():
             return jsonify({"error": "ບໍ່ພົບບົດຮຽນນີ້"}), 404
             
         user_stats = database.get_dashboard_stats(session['user_id'])
-        if user_stats['total_tokens_used'] >= user_stats['token_limit']:
-            return jsonify({"error": "ໂຄຕ້າການນຳໃຊ້ AI ຂອງທ່ານໝົດແລ້ວ (Limit Reached)"}), 429
             
         response_text, token_count = llm_helper.generate_chat_response(
             model_name=model,
@@ -503,8 +498,6 @@ def chat_with_source():
             context_text=source['text_content'],
             api_keys=api_keys
         )
-        database.increment_token_usage(session['user_id'], token_count)
-        
         return jsonify({"response": response_text})
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 400
