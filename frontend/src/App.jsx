@@ -666,11 +666,7 @@ export default function App() {
                     <div className="preview-sub">{activeTest.questions.length} ຄຳຖາມ · {cfg.diff === 'easy' ? 'ງ່າຍ' : cfg.diff === 'medium' ? 'ປານກາງ' : 'ຍາກ'}</div>
                   </div>
                   <div className="preview-btns">
-                    {!activeTest.rich_text_content && (
-                      <button className="toolbar-chip" onClick={() => setDottedLines(d => d === 0 ? 3 : d === 3 ? 5 : 0)}>
-                        <I name="edit" size={14} /> ເສັ້ນຂຽນ: {dottedLines === 0 ? 'ປິດ' : `${dottedLines} ແຖວ`}
-                      </button>
-                    )}
+
                     {!activeTest.rich_text_content && (
                       <button className="icon-btn" onClick={() => setShowExp(p => !p)} title="ສະແດງ/ເຊື່ອງຄຳຕອບ"><I name={showExp ? 'eyeOff' : 'eye'} size={16} /></button>
                     )}
@@ -678,11 +674,7 @@ export default function App() {
                       <button className="icon-btn" onClick={() => setEditModal({ mode: 'add', qType: 'obj', question_text: '', option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'A', explanation: '' })} title="ເພີ່ມ"><I name="plus" size={16} /></button>
                     )}
                     <button className="icon-btn" onClick={deleteTest} title="ລົບບົດສອບເສັງ" style={{ color: 'var(--md-error)' }}><I name="trash" size={16} /></button>
-                    {!activeTest.rich_text_content && (
-                      <button className="toolbar-chip" onClick={convertToRichDoc} style={{ background: 'var(--md-primary-container)', color: 'var(--md-on-primary-container)' }}>
-                        <I name="edit" size={14} /> ແກ້ໄຂແບບເອກະສານ
-                      </button>
-                    )}
+
                     {!activeTest.rich_text_content && (
                       <button className="toolbar-chip" onClick={() => { show('ດາວໂຫລດ Word...'); window.location.href = `/api/tests/${activeTest.id}/export/docx`; }}>
                         <I name="download" size={14} /> Word
