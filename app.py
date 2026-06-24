@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template, send_file, session
+from flask import Flask, request, jsonify, render_template, send_file, session, send_from_directory
 import os
 import pypdf
 import io
@@ -13,7 +13,7 @@ import gemini_helper
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__, template_folder='templates', static_folder='static')
+app = Flask(__name__, template_folder='templates', static_folder='frontend/dist', static_url_path='')
 app.secret_key = os.getenv("SECRET_KEY", "test-lm-default-secret-key-123456")
 
 # Initialize SQLite database
@@ -97,7 +97,7 @@ def guest_login():
         user = database.get_user_by_username(username)
         if not user:
             dummy_hash = generate_password_hash('guest_bypass_hash_code_123')
-            user_id = database.create_user(username, dummy_hash)
+            user_id = database.create_user(username, dummy_hash, token_limit=50000)
             if not user_id:
                 user = database.get_user_by_username(username)
                 if user:
@@ -152,7 +152,17 @@ def extract_text_from_pdf(file_stream):
 # Serve Frontend Home Page
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return send_from_directory(app.static_folder, 'index.html')
+
+# Catch-all route for React client-side routing
+@app.route('/<path:path>')
+def catch_all(path):
+    if path.startswith('api/'):
+        return jsonify({"error": "Not found"}), 404
+    file_path = os.path.join(app.static_folder, path)
+    if os.path.isfile(file_path):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, 'index.html')
 
 # API Endpoints for Sources (Lesson PDFs)
 @app.route('/api/sources', methods=['GET'])
@@ -284,8 +294,12 @@ def generate_test():
         if not source:
             return jsonify({"error": "ບໍ່ພົບບົດຮຽນທີ່ເລືອກ"}), 404
             
+        user_stats = database.get_dashboard_stats(session['user_id'])
+        if user_stats['total_tokens_used'] >= user_stats['token_limit']:
+            return jsonify({"error": "ໂຄຕ້າການນຳໃຊ້ AI ຂອງທ່ານໝົດແລ້ວ (Limit Reached)"}), 429
+            
         # Generate questions via Gemini
-        gemini_response = gemini_helper.generate_test_questions(
+        gemini_response, token_count = gemini_helper.generate_test_questions(
             context_text=source['text_content'],
             num_questions=num_questions,
             difficulty_lao=difficulty,
@@ -295,6 +309,7 @@ def generate_test():
             language=language,
             api_key=api_key
         )
+        database.increment_token_usage(session['user_id'], token_count)
         
         # Shuffle options if requested
         if shuffle_options and question_type == 'multiple_choice':
@@ -334,6 +349,8 @@ def generate_test():
         saved_test['time_limit'] = time_limit
         return jsonify(saved_test)
         
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
     except Exception as e:
         print(f"Generation error: {e}")
         return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການສ້າງຄຳຖາມ: {str(e)}"}), 500
@@ -347,7 +364,7 @@ def update_question(question_id):
         return jsonify({"error": "ບໍ່ມີຂໍ້ມູນສົ່ງມາ"}), 400
         
     try:
-        database.update_question(
+        result = database.update_question(
             question_id=question_id,
             question_text=data['question_text'],
             option_a=data['option_a'],
@@ -355,8 +372,11 @@ def update_question(question_id):
             option_c=data['option_c'],
             option_d=data['option_d'],
             correct_option=data['correct_option'],
-            explanation=data.get('explanation', '')
+            explanation=data.get('explanation', ''),
+            user_id=session['user_id']
         )
+        if result is False:
+            return jsonify({"error": "ບໍ່ພົບຄຳຖາມ ຫຼື ບໍ່ມີສິດ"}), 404
         return jsonify({"message": "ແກ້ໄຂຄຳຖາມສຳເລັດ"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -365,7 +385,7 @@ def update_question(question_id):
 @login_required
 def delete_question(question_id):
     try:
-        database.delete_question(question_id)
+        database.delete_question(question_id, user_id=session['user_id'])
         return jsonify({"message": "ລົບຄຳຖາມສຳເລັດ"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -386,8 +406,11 @@ def add_question():
             option_c=data['option_c'],
             option_d=data['option_d'],
             correct_option=data['correct_option'],
-            explanation=data.get('explanation', '')
+            explanation=data.get('explanation', ''),
+            user_id=session['user_id']
         )
+        if question_id is None:
+            return jsonify({"error": "ບໍ່ພົບບົດສອບເສັງ ຫຼື ບໍ່ມີສິດ"}), 404
         return jsonify({"id": question_id, "message": "ເພີ່ມຄຳຖາມສຳເລັດ"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -410,14 +433,21 @@ def chat_with_source():
         if not source:
             return jsonify({"error": "ບໍ່ພົບບົດຮຽນນີ້"}), 404
             
-        response_text = gemini_helper.generate_chat_response(
+        user_stats = database.get_dashboard_stats(session['user_id'])
+        if user_stats['total_tokens_used'] >= user_stats['token_limit']:
+            return jsonify({"error": "ໂຄຕ້າການນຳໃຊ້ AI ຂອງທ່ານໝົດແລ້ວ (Limit Reached)"}), 429
+            
+        response_text, token_count = gemini_helper.generate_chat_response(
             chat_history=chat_history,
             new_message=new_message,
             context_text=source['text_content'],
             api_key=api_key
         )
+        database.increment_token_usage(session['user_id'], token_count)
         
         return jsonify({"response": response_text})
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 400
     except Exception as e:
         print(f"Chat error: {e}")
         return jsonify({"error": f"ເກີດຂໍ້ຜິດພາດໃນການສົນທະນາ: {str(e)}"}), 500

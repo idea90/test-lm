@@ -98,19 +98,27 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
     \"\"\"{context_text}\"\"\"
     """
     
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=TestSchema,
-            temperature=0.2,
-        ),
-    )
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=TestSchema,
+                temperature=0.2,
+            ),
+        )
+        usage = getattr(response, "usage_metadata", None)
+        token_count = getattr(usage, "total_token_count", 0) if usage else 0
+    except Exception as e:
+        error_msg = str(e)
+        if "API_KEY" in error_msg.upper() or "400" in error_msg:
+            raise ValueError("API Key ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ມີສິດເຂົ້າເຖິງ (Gemini API Error).")
+        raise ValueError(f"ເກີດຂໍ້ຜິດພາດຈາກ Gemini API: {error_msg}")
     
     try:
         data = json.loads(response.text)
-        return data
+        return data, token_count
     except Exception as e:
         # Fallback if parsing fails (highly unlikely with Structured Outputs)
         print(f"Error parsing Gemini response: {e}")
@@ -155,13 +163,20 @@ def generate_chat_response(chat_history, new_message, context_text, api_key=None
         )
     )
     
-    response = client.models.generate_content(
-        model='gemini-2.5-flash',
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction=system_instruction,
-            temperature=0.7,
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.7,
+            )
         )
-    )
-    
-    return response.text
+        usage = getattr(response, "usage_metadata", None)
+        token_count = getattr(usage, "total_token_count", 0) if usage else 0
+        return response.text, token_count
+    except Exception as e:
+        error_msg = str(e)
+        if "API_KEY" in error_msg.upper() or "400" in error_msg:
+            raise ValueError("API Key ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ມີສິດເຂົ້າເຖິງ (Gemini API Error).")
+        raise ValueError(f"ເກີດຂໍ້ຜິດພາດຈາກ Gemini API: {error_msg}")

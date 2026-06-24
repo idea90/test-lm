@@ -4,12 +4,15 @@ import os
 DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'test_lm.db')
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=20.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 def init_db():
     conn = get_db_connection()
+    # Set WAL mode once during initialization to avoid locking issues
+    conn.execute("PRAGMA journal_mode = WAL")
     cursor = conn.cursor()
     
     # Users table
@@ -18,7 +21,9 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            total_tokens_used INTEGER DEFAULT 0,
+            token_limit INTEGER DEFAULT 500000
         )
     ''')
     
@@ -78,11 +83,19 @@ def init_db():
     if 'user_id' not in columns:
         cursor.execute("ALTER TABLE tests ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE")
         
+    # Migrate users table if needed
+    cursor.execute("PRAGMA table_info(users)")
+    columns = [row[1] for row in cursor.fetchall()]
+    if 'total_tokens_used' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN total_tokens_used INTEGER DEFAULT 0")
+    if 'token_limit' not in columns:
+        cursor.execute("ALTER TABLE users ADD COLUMN token_limit INTEGER DEFAULT 500000")
+        
     conn.commit()
     conn.close()
 
 # User management
-def create_user(username, password_hash):
+def create_user(username, password_hash, token_limit=500000):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
@@ -91,8 +104,8 @@ def create_user(username, password_hash):
         user_count = cursor.fetchone()[0]
         
         cursor.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash)
+            "INSERT INTO users (username, password_hash, token_limit) VALUES (?, ?, ?)",
+            (username, password_hash, token_limit)
         )
         user_id = cursor.lastrowid
         
@@ -115,6 +128,13 @@ def get_user_by_username(username):
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+def increment_token_usage(user_id, tokens):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET total_tokens_used = total_tokens_used + ? WHERE id = ?", (tokens, user_id))
+    conn.commit()
+    conn.close()
 
 # Source management
 def add_source(filename, file_size, text_content, user_id):
@@ -151,6 +171,12 @@ def get_source(source_id, user_id):
 def delete_source(source_id, user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Delete all tests (and their questions) linked to this source
+    cursor.execute("SELECT id FROM tests WHERE source_id = ? AND user_id = ?", (source_id, user_id))
+    test_ids = [row[0] for row in cursor.fetchall()]
+    for tid in test_ids:
+        cursor.execute("DELETE FROM questions WHERE test_id = ?", (tid,))
+    cursor.execute("DELETE FROM tests WHERE source_id = ? AND user_id = ?", (source_id, user_id))
     cursor.execute("DELETE FROM sources WHERE id = ? AND user_id = ?", (source_id, user_id))
     conn.commit()
     conn.close()
@@ -225,14 +251,32 @@ def get_test(test_id, user_id):
 def delete_test(test_id, user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Verify ownership first
+    cursor.execute("SELECT id FROM tests WHERE id = ? AND user_id = ?", (test_id, user_id))
+    if not cursor.fetchone():
+        conn.close()
+        return False
+    # Explicitly delete child questions first (safety net if FK cascade is off)
+    cursor.execute("DELETE FROM questions WHERE test_id = ?", (test_id,))
     cursor.execute("DELETE FROM tests WHERE id = ? AND user_id = ?", (test_id, user_id))
     conn.commit()
     conn.close()
+    return True
 
 # Question management
-def update_question(question_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation):
+def update_question(question_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, user_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Verify the question belongs to a test owned by this user
+    if user_id:
+        cursor.execute("""
+            SELECT q.id FROM questions q
+            JOIN tests t ON q.test_id = t.id
+            WHERE q.id = ? AND t.user_id = ?
+        """, (question_id, user_id))
+        if not cursor.fetchone():
+            conn.close()
+            return False
     cursor.execute(
         """UPDATE questions 
            SET question_text = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, correct_option = ?, explanation = ?
@@ -241,12 +285,21 @@ def update_question(question_id, question_text, option_a, option_b, option_c, op
     )
     conn.commit()
     conn.close()
+    return True
 
-def delete_question(question_id):
+def delete_question(question_id, user_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT test_id FROM questions WHERE id = ?", (question_id,))
+    # Verify ownership
+    if user_id:
+        cursor.execute("""
+            SELECT q.test_id FROM questions q
+            JOIN tests t ON q.test_id = t.id
+            WHERE q.id = ? AND t.user_id = ?
+        """, (question_id, user_id))
+    else:
+        cursor.execute("SELECT test_id FROM questions WHERE id = ?", (question_id,))
     row = cursor.fetchone()
     if row:
         test_id = row[0]
@@ -256,9 +309,15 @@ def delete_question(question_id):
     conn.commit()
     conn.close()
 
-def add_question(test_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation):
+def add_question(test_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, user_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
+    # Verify the test belongs to the user
+    if user_id:
+        cursor.execute("SELECT id FROM tests WHERE id = ? AND user_id = ?", (test_id, user_id))
+        if not cursor.fetchone():
+            conn.close()
+            return None
     cursor.execute(
         """INSERT INTO questions (test_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -273,6 +332,12 @@ def add_question(test_id, question_text, option_a, option_b, option_c, option_d,
 def get_dashboard_stats(user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
+    
+    # 0. User limits
+    cursor.execute("SELECT total_tokens_used, token_limit FROM users WHERE id = ?", (user_id,))
+    user_row = cursor.fetchone()
+    total_tokens_used = user_row['total_tokens_used'] if user_row else 0
+    token_limit = user_row['token_limit'] if user_row else 500000
     
     # 1. General counts
     cursor.execute("SELECT COUNT(*) FROM sources WHERE user_id = ?", (user_id,))
@@ -349,6 +414,8 @@ def get_dashboard_stats(user_id):
     conn.close()
     
     return {
+        "total_tokens_used": total_tokens_used,
+        "token_limit": token_limit,
         "total_sources": total_sources,
         "total_tests": total_tests,
         "total_questions": total_questions,
