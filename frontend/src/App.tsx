@@ -31,6 +31,11 @@ const I = ({ name, size = 20, style, className }: { name: string; size?: number;
     'check-circle': 'M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3',
     'arrow-left': 'M19 12H5 M12 19l-7-7 7-7',
     'image': 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-5-5L5 21',
+    cpu: 'M18 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2zM9 20v2M15 20v2M9 2v2M15 2v2M20 9h2M20 15h2M2 9h2M2 15h2',
+    terminal: 'M4 17l6-6-6-6M12 19h8',
+    globe: 'M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z',
+    list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+    shuffle: 'M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5',
   };
   return (
     <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
@@ -247,6 +252,8 @@ export default function App() {
   const [previewExamNo, setPreviewExamNo] = useState('........');
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewTime, setPreviewTime] = useState('90');
+  const [previewGrade, setPreviewGrade] = useState('ມ.7');
+  const [showWatermark, setShowWatermark] = useState(true);
   const [previewSection, setPreviewSection] = useState('I. ພາກປາລະໄນ');
   const [previewInstructions, setPreviewInstructions] = useState('ຈົ່ງເລືອກເອົາຂໍ້ທີ່ຖືກຕ້ອງທີ່ສຸດພຽງຂໍ້ດຽວຈາກຄຳຖາມລຸ່ມນີ້:');
   const [previewTotalScore, setPreviewTotalScore] = useState(10);
@@ -806,6 +813,22 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="exam-paper">
+                    <div className="exam-paper-top-meta" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontSize: '12px', color: 'rgba(0, 0, 0, 0.45)', fontFamily: "var(--font)" }}>
+                      <div className="grade-indicator" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span>ຊັ້ນ:</span>
+                        <input 
+                          className="inline-input" 
+                          defaultValue={previewGrade} 
+                          onBlur={e => setPreviewGrade(e.target.value)} 
+                          style={{ width: '80px', fontWeight: 500, borderBottomColor: 'rgba(0,0,0,0.15)' }} 
+                        />
+                      </div>
+                      {showWatermark && (
+                        <div className="paper-watermark" style={{ fontSize: '11px', fontStyle: 'italic', letterSpacing: '0.5px' }}>
+                          ສ້າງໂດຍ Test LM
+                        </div>
+                      )}
+                    </div>
                     <div className="exam-paper-header-official">
 
                       {/* Editable Motto */}
@@ -1061,11 +1084,21 @@ export default function App() {
             <div className="dialog-header">ຕັ້ງຄ່າບົດສອບເສັງ</div>
             <div className="dialog-body">
               <div className="config-field">
-                <div className="config-field-label">ໂມເດວ AI</div>
+                <div className="config-field-label">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <I name="cpu" size={14} style={{ color: 'var(--md-outline)' }} />
+                    ໂມເດວ AI
+                  </span>
+                </div>
                 <ModelSelect value={cfg.model || 'gemini-2.5-flash'} onChange={val => setCfg(p => ({ ...p, model: val }))} />
               </div>
               <div className="config-field">
-                <div className="config-field-label">ຄຳສັ່ງລະບົບ (System Prompt)</div>
+                <div className="config-field-label">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <I name="terminal" size={14} style={{ color: 'var(--md-outline)' }} />
+                    ຄຳສັ່ງລະບົບ (System Prompt)
+                  </span>
+                </div>
                 <select className="md-select" value={cfg.systemPrompt || 'default'} onChange={e => setCfg(p => ({ ...p, systemPrompt: e.target.value }))}>
                   {systemPrompts.map(sp => (
                     <option key={sp} value={sp}>{sp === 'default' ? 'ມາດຕະຖານ' : sp}</option>
@@ -1073,11 +1106,22 @@ export default function App() {
                 </select>
               </div>
               <div className="config-field">
-                <div className="config-field-label"><span>ຈຳນວນ</span><span className="config-field-badge">{cfg.numQ} ຂໍ້</span></div>
+                <div className="config-field-label">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
+                    ຈຳນວນ
+                  </span>
+                  <span className="config-field-badge">{cfg.numQ} ຂໍ້</span>
+                </div>
                 <input type="range" min="5" max="30" step="5" value={cfg.numQ} onChange={e => setCfg(p => ({ ...p, numQ: +e.target.value }))} />
               </div>
               <div className="config-field">
-                <div className="config-field-label">ລະດັບ</div>
+                <div className="config-field-label">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <I name="zap" size={14} style={{ color: 'var(--md-outline)' }} />
+                    ລະດັບ
+                  </span>
+                </div>
                 <div className="segmented-group">
                   {[['easy','ງ່າຍ'],['medium','ປານກາງ'],['hard','ຍາກ']].map(([k, l]) => (
                     <button key={k} className={`segmented-btn ${cfg.diff === k ? 'active' : ''}`} onClick={() => setCfg(p => ({ ...p, diff: k }))}>
@@ -1087,7 +1131,12 @@ export default function App() {
                 </div>
               </div>
               <div className="config-field">
-                <div className="config-field-label">ພາສາ</div>
+                <div className="config-field-label">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <I name="globe" size={14} style={{ color: 'var(--md-outline)' }} />
+                    ພາສາ
+                  </span>
+                </div>
                 <select className="md-select" value={cfg.lang} onChange={e => setCfg(p => ({ ...p, lang: e.target.value }))}>
                   <option value="lao">ພາສາລາວ</option>
                   <option value="english">ພາສາອັງກິດ</option>
@@ -1095,7 +1144,12 @@ export default function App() {
                 </select>
               </div>
               <div className="config-field">
-                <div className="config-field-label">ຮູບແບບ</div>
+                <div className="config-field-label">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <I name="check-circle" size={14} style={{ color: 'var(--md-outline)' }} />
+                    ຮູບແບບ
+                  </span>
+                </div>
                 <select className="md-select" value={cfg.type} onChange={e => setCfg(p => ({ ...p, type: e.target.value }))}>
                   <option value="multiple_choice">ປາລະໄນ (ເລືອກຕອບ)</option>
                   <option value="true_false">ຖືກ / ຜິດ</option>
@@ -1104,16 +1158,32 @@ export default function App() {
                 </select>
               </div>
               <div className="config-field">
-                <div className="config-field-label">ຄຳສັ່ງເພີ່ມ</div>
+                <div className="config-field-label">
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <I name="edit" size={14} style={{ color: 'var(--md-outline)' }} />
+                    ຄຳສັ່ງເພີ່ມ
+                  </span>
+                </div>
                 <textarea className="md-textarea" rows={2} placeholder="ເນັ້ນບົດທີ 3..." value={cfg.custom} onChange={e => setCfg(p => ({ ...p, custom: e.target.value }))} />
               </div>
-              <label className="md-custom-checkbox-row">
-                <input type="checkbox" className="md-custom-checkbox-input" checked={cfg.shuffle} onChange={e => setCfg(p => ({ ...p, shuffle: e.target.checked }))} />
-                <div className="md-custom-checkbox-box">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
-                </div>
-                <span>ສັບປ່ຽນລຳດັບ</span>
-              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
+                <label className="md-custom-checkbox-row">
+                  <input type="checkbox" className="md-custom-checkbox-input" checked={cfg.shuffle} onChange={e => setCfg(p => ({ ...p, shuffle: e.target.checked }))} />
+                  <div className="md-custom-checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                  </div>
+                  <I name="shuffle" size={16} style={{ color: 'var(--md-outline)' }} />
+                  <span>ສັບປ່ຽນລຳດັບ</span>
+                </label>
+                <label className="md-custom-checkbox-row">
+                  <input type="checkbox" className="md-custom-checkbox-input" checked={showWatermark} onChange={e => setShowWatermark(e.target.checked)} />
+                  <div className="md-custom-checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                  </div>
+                  <I name="eye" size={16} style={{ color: 'var(--md-outline)' }} />
+                  <span>ສະແດງລາຍນ້ຳ (Watermark)</span>
+                </label>
+              </div>
             </div>
             <div className="dialog-actions">
               <button className="md-btn-text" onClick={() => setConfigOpen(false)}>ຍົກເລີກ</button>
