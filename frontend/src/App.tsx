@@ -376,7 +376,7 @@ export default function App() {
         } else {
           showAlert(d.error || 'ບໍ່ສາມາດອ່ານຂໍ້ມູນ PDF ໄດ້');
         }
-      } catch (err) {
+      } catch {
         showAlert('ເກີດຂໍ້ຜິດພາດໃນການກວດສອບ PDF');
       } finally {
         setUploading(false);
@@ -719,6 +719,16 @@ export default function App() {
                     <button className="icon-btn" onClick={deleteTest} title="ລົບບົດສອບເສັງ" style={{ color: 'var(--md-error)' }}><I name="trash" size={16} /></button>
 
                     {!activeTest.rich_text_content && (
+                      <button className="toolbar-chip" onClick={() => setDottedLines(p => p === 0 ? 3 : p === 3 ? 5 : 0)}>
+                        ເສັ້ນຂຽນ: {dottedLines === 0 ? 'ປິດ' : `${dottedLines} ແຖວ`}
+                      </button>
+                    )}
+                    {!activeTest.rich_text_content && (
+                      <button className="toolbar-chip" onClick={convertToRichDoc}>
+                        <I name="edit" size={14} /> ປ່ຽນເປັນເອກະສານ
+                      </button>
+                    )}
+                    {!activeTest.rich_text_content && (
                       <button className="toolbar-chip" onClick={() => { show('ດາວໂຫລດ Word...'); window.location.href = `/api/tests/${activeTest.id}/export/docx`; }}>
                         <I name="download" size={14} /> ສົ່ງອອກ Word
                       </button>
@@ -950,8 +960,8 @@ export default function App() {
                         <span style={{ fontSize: '15px', color: 'var(--md-on-surface)', fontWeight: '600' }}>ເລືອກໄຟລ໌ບົດຮຽນຈາກແຖບດ້ານຊ້າຍມືເພື່ອເລີ່ມຕົ້ນ</span>
                       </div>
                       <span style={{ fontSize: '13px', color: 'var(--md-on-surface-variant)', margin: '-8px 0 0' }}>ຫຼື ອັບໂຫລດໄຟລ໌ໃໝ່ຂອງທ່ານເອງ:</span>
-                      <button className="md-btn" style={{ padding: '0 28px', height: '44px', borderRadius: '22px', marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} onClick={() => fileRef.current?.click()}>
-                        <I name="upload" size={18} style={{ marginRight: '8px' }} /> ອັບໂຫລດໄຟລ໌ບົດຮຽນ
+                      <button className="md-btn-tonal" style={{ padding: '0 28px', height: '44px', marginTop: '4px' }} onClick={() => fileRef.current?.click()}>
+                        <I name="upload" size={18} /> ອັບໂຫລດໄຟລ໌ບົດຮຽນ
                       </button>
                     </>
                   )}
@@ -1180,7 +1190,11 @@ export default function App() {
                 } else {
                   d = { ...d, option_a: editModal.option_a, option_b: editModal.option_b, option_c: editModal.option_c, option_d: editModal.option_d, correct_option: editModal.correct_option };
                 }
-                editModal.mode === 'add' ? addQ(d) : updateQ(editModal.id, d);
+                if (editModal.mode === 'add') {
+                  addQ(d);
+                } else {
+                  updateQ(editModal.id, d);
+                }
               }}>ບັນທຶກ</button>
             </div>
           </div>
