@@ -216,26 +216,53 @@ body {
 
 /* Rich Document Editor */
 .rich-toolbar {
-  display: flex; gap: 8px; padding: 12px;
-  background: var(--md-surface-container-high);
+  display: flex; gap: 8px; padding: 12px 16px;
+  background: var(--md-surface-container-low);
   border-bottom: 1px solid var(--md-outline-variant);
   border-radius: var(--shape-md) var(--shape-md) 0 0;
   align-items: center;
 }
-.rich-toolbar button {
-  background: var(--md-surface);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: var(--shape-sm);
-  padding: 6px 12px; cursor: pointer;
-  font-size: 13px; font-weight: 500;
+.rich-toolbar-group {
+  display: flex; gap: 4px;
+}
+.rich-toolbar-btn {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px; cursor: pointer;
+  font-size: 14px; font-weight: 500; font-family: var(--font);
+  color: var(--md-on-surface-variant);
+  transition: background 0.2s, color 0.2s;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  gap: 6px; white-space: nowrap;
+}
+.rich-toolbar-btn:hover {
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
+}
+.rich-toolbar-divider {
+  width: 1px; height: 24px;
+  background: var(--md-outline-variant);
+  margin: 0 4px;
+}
+.rich-toolbar-save {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  border: none;
+  border-radius: 20px;
+  padding: 8px 20px; cursor: pointer;
+  font-size: 14px; font-weight: 600; font-family: var(--font);
   transition: all 0.2s;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  white-space: nowrap;
+  align-items: center; justify-content: center;
+  gap: 6px; white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-.rich-toolbar button:hover { background: var(--md-primary-container); color: var(--md-on-primary-container); border-color: var(--md-primary); }
+.rich-toolbar-save:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  transform: translateY(-1px);
+}
 .rich-editor-content {
   padding: 40px; min-height: 600px;
   background: #fff; color: #000;
@@ -1106,6 +1133,27 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--md-on-primary);
 }
 
+.price-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--shape-full);
+  font-weight: 600;
+  margin-left: 6px;
+  display: inline-block;
+}
+.price-badge.cheap {
+  background: var(--md-success-container);
+  color: var(--md-success);
+}
+.price-badge.expensive {
+  background: var(--md-error-container);
+  color: var(--md-error);
+}
+.custom-dropdown-item.selected .price-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: inherit;
+}
+
 .md-textarea {
   width: 100%; padding: 12px 16px;
   font-size: 14px; font-family: var(--font);
@@ -1302,6 +1350,58 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 50%; animation: spin 0.7s linear infinite;
 }
 .md-spinner.on-primary { border-color: rgba(255,255,255,0.3); border-top-color: white; }
+
+/* ═══ Loading Animation ═══ */
+.center-loading {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 100%; min-height: 400px; text-align: center;
+  padding: 40px;
+}
+.loading-animation {
+  position: relative; margin-bottom: 40px;
+  display: flex; align-items: center; justify-content: center;
+  width: 140px; height: 140px;
+}
+.wand-icon {
+  color: var(--md-primary);
+  z-index: 2;
+  animation: wandFloat 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 12px var(--md-primary));
+}
+.loading-waves {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.loading-waves .wave {
+  position: absolute;
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  background: var(--md-primary);
+  opacity: 0;
+  animation: wavePulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.loading-waves .wave:nth-child(2) { animation-delay: 0.6s; }
+.loading-waves .wave:nth-child(3) { animation-delay: 1.2s; }
+
+@keyframes wandFloat {
+  0%, 100% { transform: translateY(0) rotate(-10deg); }
+  50% { transform: translateY(-15px) rotate(10deg); }
+}
+@keyframes wavePulse {
+  0% { transform: scale(0.3); opacity: 0.5; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.center-loading h2 {
+  font-size: 26px; font-weight: 700; margin-bottom: 12px;
+  background: linear-gradient(90deg, var(--md-primary), var(--md-tertiary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: pulse 2s infinite;
+}
+.center-loading p {
+  font-size: 16px; color: var(--md-on-surface-variant); max-width: 400px; line-height: 1.6;
+}
 
 /* ═══ Responsive ═══ */
 @media (max-width: 768px) {
