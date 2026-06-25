@@ -4,6 +4,7 @@ import './index.css';
 // ═══ Icons ═══
 const I = ({ name, size = 20, style }: { name: string; size?: number; style?: React.CSSProperties }) => {
   const d: Record<string, string> = {
+    github: 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22',
     zap: 'M13 2L3 14h7l-1 8 10-12h-7l1-8z',
     upload: 'M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12',
     file: 'M14.5 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V7.5L14.5 2zM14 2v6h6',
@@ -594,11 +595,14 @@ export default function App() {
     <div className="app-shell">
       {/* ═══ Sources Sidebar ═══ */}
       <aside className="sources-sidebar">
-        <div className="sb-header">
+        <div className="sb-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="sb-logo">
             <div className="sb-logo-icon"><I name="zap" size={18} /></div>
             <span className="sb-logo-text">Test LM</span>
           </div>
+          <a href="https://github.com/idea90/test-lm" target="_blank" rel="noopener noreferrer" className="github-link" title="GitHub Repository">
+            <I name="github" size={20} />
+          </a>
         </div>
 
         {/* Upload */}

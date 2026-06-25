@@ -307,6 +307,21 @@ body {
   letter-spacing: -0.3px;
 }
 
+.github-link {
+  color: var(--md-on-surface-variant);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 50%;
+}
+.github-link:hover {
+  color: var(--md-on-surface);
+  background: var(--md-surface-container-high);
+  transform: scale(1.08);
+}
+
 .sb-upload {
   margin: 0 16px 12px;
   padding: 12px;
