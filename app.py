@@ -24,8 +24,8 @@ app.add_middleware(
 # Initialize SQLite database
 database.init_db()
 
-POPPLER_PATH = r"C:\Users\idea\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+POPPLER_PATH = os.getenv("POPPLER_PATH") or r"C:\Users\idea\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
+pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_CMD") or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 UPLOAD_AVATAR_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'avatars')
 os.makedirs(UPLOAD_AVATAR_FOLDER, exist_ok=True)
@@ -225,7 +225,7 @@ def generate_docx_file(test_data):
             k_run2 = kp.add_run(q.get('explanation') or 'ບໍ່ມີແນວທາງຄຳຕອບ')
             k_run2.bold = True
         else:
-            correct_lao = lao_options.get(q['correct_option'], q['correct_option'])
+            correct_lao = lao_options.get(q['correct_option'].upper(), q['correct_option'])
             k_run1 = kp.add_run(f"ຂໍ້ {i}. ຕອບ: ")
             k_run2 = kp.add_run(f"{correct_lao}")
             k_run2.bold = True
