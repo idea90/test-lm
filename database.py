@@ -258,7 +258,7 @@ def get_test(test_id, user_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT t.id, t.title, t.difficulty, t.num_questions, t.source_id, t.created_at, s.filename as source_filename
+        SELECT t.id, t.title, t.difficulty, t.num_questions, t.source_id, t.rich_text_content, t.created_at, s.filename as source_filename
         FROM tests t
         LEFT JOIN sources s ON t.source_id = s.id
         WHERE t.id = ? AND t.user_id = ?
@@ -291,6 +291,18 @@ def delete_test(test_id, user_id):
     conn.commit()
     conn.close()
     return True
+
+def update_test_rich_text(test_id, user_id, rich_text_content):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE tests SET rich_text_content = ? WHERE id = ? AND user_id = ?",
+        (rich_text_content, test_id, user_id)
+    )
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
 
 # Question management
 def update_question(question_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, user_id=None):

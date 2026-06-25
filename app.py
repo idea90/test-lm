@@ -866,6 +866,10 @@ async def chat_with_source(request: Request):
 @app.get("/uploads/avatars/{filename:path}")
 def uploaded_avatar(filename: str):
     file_path = os.path.join(UPLOAD_AVATAR_FOLDER, filename)
+    # Prevent directory traversal
+    resolved_path = os.path.abspath(file_path)
+    if not resolved_path.startswith(os.path.abspath(UPLOAD_AVATAR_FOLDER)):
+        return JSONResponse(status_code=403, content={"detail": "Access denied"})
     if os.path.isfile(file_path):
         return FileResponse(file_path)
     return JSONResponse(status_code=404, content={"detail": "Avatar not found"})
