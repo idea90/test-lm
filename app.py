@@ -37,7 +37,7 @@ def get_current_user(request: Request):
         return None
     return user_id
 
-def extract_text_from_pdf(file_stream, page_start=1, page_end=None):
+def extract_text_from_pdf(file_stream, page_start=1, page_end=None, force_ocr=False):
     try:
         reader = pypdf.PdfReader(file_stream)
         total_pages = len(reader.pages)
@@ -50,12 +50,14 @@ def extract_text_from_pdf(file_stream, page_start=1, page_end=None):
         
         text = ""
         for i in range(start_idx, end_idx):
-            page = reader.pages[i]
-            page_text = page.extract_text()
+            page_text = ""
+            if not force_ocr:
+                page = reader.pages[i]
+                page_text = page.extract_text() or ""
             
-            if not page_text or len(page_text.strip()) < 15:
+            if force_ocr or not page_text or len(page_text.strip()) < 15:
                 page_num = i + 1
-                print(f"PyPDF extracted minimal text for page {page_num}. Trying Tesseract OCR fallback...")
+                print(f"Running Tesseract OCR on page {page_num}...")
                 try:
                     images = convert_from_bytes(pdf_bytes, first_page=page_num, last_page=page_num, poppler_path=POPPLER_PATH)
                     if images:
@@ -473,7 +475,8 @@ async def upload_source(
     request: Request,
     file: UploadFile = File(...),
     page_start: str = Form(None),
-    page_end: str = Form(None)
+    page_end: str = Form(None),
+    force_ocr: str = Form(None)
 ):
     user_id = get_current_user(request)
     if not user_id:
@@ -491,10 +494,11 @@ async def upload_source(
         
         p_start = int(page_start) if page_start and page_start.strip() != "" else None
         p_end = int(page_end) if page_end and page_end.strip() != "" else None
+        force_ocr_bool = force_ocr == 'true' or force_ocr == '1'
         
         extracted_text = None
         if filename_lower.endswith('.pdf'):
-            extracted_text = extract_text_from_pdf(file_stream, page_start=p_start, page_end=p_end)
+            extracted_text = extract_text_from_pdf(file_stream, page_start=p_start, page_end=p_end, force_ocr=force_ocr_bool)
         elif filename_lower.endswith('.docx'):
             extracted_text = extract_text_from_docx(file_stream)
         else:

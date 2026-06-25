@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './index.css';
 
 // ═══ Icons ═══
-const I = ({ name, size = 20, style }: { name: string; size?: number; style?: React.CSSProperties }) => {
+const I = ({ name, size = 20, style, className }: { name: string; size?: number; style?: React.CSSProperties; className?: string }) => {
   const d: Record<string, string> = {
     github: 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22',
     zap: 'M13 2L3 14h7l-1 8 10-12h-7l1-8z',
@@ -30,9 +30,10 @@ const I = ({ name, size = 20, style }: { name: string; size?: number; style?: Re
     'book-open': 'M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z',
     'check-circle': 'M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3',
     'arrow-left': 'M19 12H5 M12 19l-7-7 7-7',
+    'image': 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5z M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M21 15l-5-5L5 21',
   };
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <path d={d[name] || ''} />
     </svg>
   );
@@ -231,6 +232,7 @@ export default function App() {
   const [rangeDialogPages, setRangeDialogPages] = useState(0);
   const [rangeDialogStart, setRangeDialogStart] = useState(1);
   const [rangeDialogEnd, setRangeDialogEnd] = useState(1);
+  const [forceOcr, setForceOcr] = useState(false);
 
   const [previewSchool, setPreviewSchool] = useState('ໂຮງຮຽນ ມັດທະຍົມສົມບູນ...');
   const [previewSubject, setPreviewSubject] = useState('ວິຊາ: ບົດຮຽນທົ່ວໄປ');
@@ -258,7 +260,7 @@ export default function App() {
   const { ts, show } = useToast();
   const fileRef = useRef(null);
 
-  const [dialog, setDialog] = useState(null); // { type: 'alert' | 'confirm', title: '', message: '', onConfirm: () => void, onCancel?: () => void }
+  const [dialog, setDialog] = useState(null); // { type: 'alert' | 'confirm' | 'prompt', title: '', message: '', placeholder: '', value: '', onConfirm: (val?) => void, onCancel?: () => void, onChange?: (val) => void }
 
   const showAlert = (message, title = 'ແຈ້ງເຕືອນ') => {
     setDialog({ type: 'alert', title, message, onConfirm: () => {} });
@@ -266,6 +268,10 @@ export default function App() {
 
   const showConfirm = (message, onConfirm, title = 'ຢືນຢັນ') => {
     setDialog({ type: 'confirm', title, message, onConfirm });
+  };
+
+  const showPrompt = (message, placeholder, onConfirm, title = 'ປ້ອນຂໍ້ມູນ') => {
+    setDialog({ type: 'prompt', title, message, placeholder, value: '', onConfirm, onChange: (v) => setDialog(d => ({ ...d, value: v })) });
   };
 
   useEffect(() => { checkAuth(); }, []);
@@ -392,6 +398,7 @@ export default function App() {
     fd.append('file', file);
     if (pageStart !== null) fd.append('page_start', pageStart);
     if (pageEnd !== null) fd.append('page_end', pageEnd);
+    if (forceOcr) fd.append('force_ocr', 'true');
 
     try {
       const r = await api.postForm('/api/sources/upload', fd);
@@ -408,6 +415,7 @@ export default function App() {
       showAlert('ເກີດຂໍ້ຜິດພາດໃນການອັບໂຫລດ');
     } finally {
       setUploading(false);
+      setForceOcr(false);
       if (fileRef.current) fileRef.current.value = '';
     }
   };
@@ -700,7 +708,20 @@ export default function App() {
         {/* ── Test View: Center Preview ── */}
         {view === 'test' && (
           <div className="center-scroll">
-            {activeTest ? (
+            {genLoading ? (
+              <div className="center-loading animate-in">
+                <div className="loading-animation">
+                  <I name="wand" size={56} className="wand-icon" />
+                  <div className="loading-waves">
+                    <div className="wave"></div>
+                    <div className="wave"></div>
+                    <div className="wave"></div>
+                  </div>
+                </div>
+                <h2>ກຳລັງສ້າງບົດສອບເສັງອັດສະລິຍະ...</h2>
+                <p>ກະລຸນາລໍຖ້າຈັກໜ່ອຍ, ລະບົບກຳລັງວິເຄາະບົດຮຽນຂອງທ່ານເພື່ອສ້າງຄຳຖາມທີ່ດີທີ່ສຸດ.</p>
+              </div>
+            ) : activeTest ? (
               <div className="preview-wrapper animate-up">
                 {/* Action row above the sheet */}
                 <div className="preview-action-row">
@@ -718,16 +739,12 @@ export default function App() {
                     )}
                     <button className="icon-btn" onClick={deleteTest} title="ລົບບົດສອບເສັງ" style={{ color: 'var(--md-error)' }}><I name="trash" size={16} /></button>
 
-                    {!activeTest.rich_text_content && (
+                    {!activeTest.rich_text_content && activeTest?.questions?.some(q => q.question_type !== 'multiple_choice') && (
                       <button className="toolbar-chip" onClick={() => setDottedLines(p => p === 0 ? 3 : p === 3 ? 5 : 0)}>
                         ເສັ້ນຂຽນ: {dottedLines === 0 ? 'ປິດ' : `${dottedLines} ແຖວ`}
                       </button>
                     )}
-                    {!activeTest.rich_text_content && (
-                      <button className="toolbar-chip" onClick={convertToRichDoc}>
-                        <I name="edit" size={14} /> ປ່ຽນເປັນເອກະສານ
-                      </button>
-                    )}
+
                     {!activeTest.rich_text_content && (
                       <button className="toolbar-chip" onClick={() => { show('ດາວໂຫລດ Word...'); window.location.href = `/api/tests/${activeTest.id}/export/docx`; }}>
                         <I name="download" size={14} /> ສົ່ງອອກ Word
@@ -740,19 +757,37 @@ export default function App() {
                 {activeTest.rich_text_content ? (
                   <div className="exam-paper" style={{ padding: 0 }}>
                     <div className="rich-toolbar" contentEditable={false}>
-                      <button onClick={() => document.execCommand('bold')}>B</button>
-                      <button onClick={() => document.execCommand('italic')}>I</button>
-                      <button onClick={() => document.execCommand('underline')}>U</button>
-                      <button onClick={() => {
-                        const url = prompt('Image URL or Base64 (ສາມາດ paste ໃສ່ຮູບໂດຍກົງໄດ້):');
-                        if (url) document.execCommand('insertImage', false, url);
-                      }}><I name="plus" size={14} style={{display:'inline-block', verticalAlign:'middle'}}/> ໃສ່ຮູບ</button>
+                      <div className="rich-toolbar-group">
+                        <button className="rich-toolbar-btn" onClick={() => document.execCommand('bold')}>B</button>
+                        <button className="rich-toolbar-btn" onClick={() => document.execCommand('italic')}>I</button>
+                        <button className="rich-toolbar-btn" onClick={() => document.execCommand('underline')}>U</button>
+                      </div>
+                      <div className="rich-toolbar-divider" />
+                      <label className="rich-toolbar-btn" style={{ margin: 0, cursor: 'pointer' }}>
+                        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const result = ev.target?.result;
+                              if (typeof result === 'string') {
+                                document.execCommand('insertImage', false, result);
+                              }
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                          e.target.value = ''; // Reset input
+                        }} />
+                        <I name="image" size={14} style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '4px' }} /> ໃສ່ຮູບ
+                      </label>
                       <div style={{flex: 1}} />
-                      <button className="md-btn-filled" style={{border:'none', color:'#fff', background:'var(--md-primary)'}} onClick={async () => {
+                      <button className="rich-toolbar-save" onClick={async () => {
                         const html = document.getElementById('rich-editor').innerHTML;
                         await api.put(`/api/tests/${activeTest.id}/rich_text`, { rich_text_content: html });
                         show('ບັນທຶກເອກະສານສຳເລັດ');
-                      }}>ບັນທຶກ</button>
+                      }}>
+                        ບັນທຶກ
+                      </button>
                     </div>
                     <div 
                       id="rich-editor"
@@ -1261,6 +1296,19 @@ export default function App() {
                   />
                 </div>
               </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
+                <input
+                  type="checkbox"
+                  id="force-ocr-checkbox"
+                  checked={forceOcr}
+                  onChange={e => setForceOcr(e.target.checked)}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+                <label htmlFor="force-ocr-checkbox" style={{ fontSize: '13px', cursor: 'pointer', color: 'var(--md-on-surface-variant)' }}>
+                  ບັງຄັບໃຊ້ OCR (ສຳລັບ PDF ທີ່ເປັນຮູບສະແກນ)
+                </label>
+              </div>
             </div>
             <div className="dialog-actions" style={{ padding: '8px 24px 24px' }}>
               <button className="md-btn-text" onClick={() => setRangeDialogOpen(false)}>ຍົກເລີກ</button>
@@ -1364,17 +1412,30 @@ export default function App() {
             </div>
             <div className="dialog-body" style={{ padding: '0 24px 20px', fontSize: 14, color: 'var(--md-on-surface-variant)', lineHeight: 1.6 }}>
               {dialog.message}
+              {dialog.type === 'prompt' && (
+                <div style={{ marginTop: 12 }}>
+                  <input 
+                    type="text" 
+                    autoFocus
+                    className="md-input" 
+                    placeholder={dialog.placeholder} 
+                    value={dialog.value || ''} 
+                    onChange={e => dialog.onChange?.(e.target.value)} 
+                    onKeyDown={e => { if (e.key === 'Enter') { dialog.onConfirm?.(dialog.value); setDialog(null); } }}
+                  />
+                </div>
+              )}
             </div>
             <div className="dialog-actions" style={{ padding: '8px 24px 24px' }}>
-              {dialog.type === 'confirm' && (
+              {(dialog.type === 'confirm' || dialog.type === 'prompt') && (
                 <button className="md-btn-text" onClick={() => { dialog.onCancel?.(); setDialog(null); }}>ຍົກເລີກ</button>
               )}
               <button 
                 className="md-btn-filled" 
                 style={{ width: 'auto', padding: '10px 24px', borderRadius: 'var(--shape-full)' }} 
-                onClick={() => { dialog.onConfirm?.(); setDialog(null); }}
+                onClick={() => { dialog.onConfirm?.(dialog.value); setDialog(null); }}
               >
-                {dialog.type === 'confirm' ? 'ຕົກລົງ' : 'ປິດ'}
+                {dialog.type === 'alert' ? 'ປິດ' : 'ຕົກລົງ'}
               </button>
             </div>
           </div>
