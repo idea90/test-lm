@@ -637,6 +637,9 @@ async def generate_test(request: Request):
     
     system_prompt_name = data.get('system_prompt', 'default')
     if system_prompt_name and system_prompt_name != 'default':
+        import re
+        if not re.match(r"^[a-zA-Z0-9_-]+$", system_prompt_name):
+            return JSONResponse(status_code=400, content={"error": "ຮູບແບບຊື່ System Prompt ບໍ່ຖືກຕ້ອງ"})
         prompt_path = os.path.join(os.path.dirname(__file__), 'system-prompt-lao', f"{system_prompt_name}.txt")
         if os.path.exists(prompt_path):
             with open(prompt_path, 'r', encoding='utf-8') as f:
@@ -678,7 +681,7 @@ async def generate_test(request: Request):
             api_keys=api_keys
         )
         
-        if shuffle_options and question_type == 'multiple_choice':
+        if shuffle_options and question_type in ['multiple_choice', 'mixed']:
             import random
             for q in gemini_response['questions']:
                 options = [
