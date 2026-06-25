@@ -67,20 +67,19 @@ const LAO: Record<string, string> = { A: 'ກ', B: 'ຂ', C: 'ຄ', D: 'ງ' };
 
 const MODELS = [
   // ─── Google Gemini ───
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', desc: '\u0ec4\u0ea7 \u0ec1\u0ea5\u0eb0 \u0e9b\u0eb0\u0ea2\u0eb1\u0e94 (\u0ec1\u0e99\u0eb0\u0e99\u0eb3)', badge: 'Gemini' },
-  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', desc: '\u0e9b\u0eb0\u0eaa\u0eb4\u0e94\u0e97\u0eb4\u0e9e\u0eb2\u0e9a\u0eaa\u0eb9\u0e87 & \u0ea7\u0ebd\u0e81\u0e8a\u0eb1\u0e9a\u0e8a\u0ec9\u0ead\u0e99', badge: 'Gemini' },
-  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', provider: 'gemini', desc: '\u0ec3\u0eab\u0ea1\u0ec8\u0ea5\u0ec8\u0eb2\u0eaa\u0eb8\u0e94! \u0eaa\u0eb0\u0eab\u0ebc\u0eb2\u0e94 \u0ec1\u0ea5\u0eb0 \u0e9c\u0eb0\u0ea5\u0e97\u0ee4\u0e94\u0e94\u0eb5\u0ec0\u0ea5\u0eb5\u0e94', badge: 'Gemini' },
-  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'gemini', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0ec4\u0ea7 \u0e9e\u0ead\u0ec3\u0e88 \u0eaa\u0eb3\u0ea5\u0eb1\u0e9a\u0e87\u0eb2\u0e99\u0ec3\u0eab\u0e8d\u0ec8', badge: 'Gemini' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', desc: 'ໄວ ແລະ ປະຢັດ (ແນະນຳ)', badge: 'Gemini' },
+  { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'gemini', desc: 'ໃຫມ່! ໄວ ແລະ ສະຫຼາດຂຶ້ນ', badge: 'Gemini' },
+  { id: 'gemini-3.5-pro', name: 'Gemini 3.5 Pro', provider: 'gemini', desc: 'ໃຫມ່ລ່າສຸດ! ປະສິດທິພາບສູງສຸດ & ວຽກຊັບຊ້ອນ', badge: 'Gemini' },
   // ─── OpenAI ───
-  { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', desc: '\u0ec2\u0ea1\u0ec0\u0e94\u0ea7\u0ead\u0eb0\u0ec0\u0e99\u0e81\u0e9b\u0eb0\u0eaa\u0ebb\u0e87 \u0e82\u0ead\u0e87 OpenAI', badge: 'OpenAI' },
-  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', desc: '\u0ec4\u0ea7 \u0ec1\u0ea5\u0eb0 \u0e82\u0eb0\u0edc\u0eb2\u0e94\u0e99\u0ec9\u0ead\u0e8d \u0e82\u0ead\u0e87 OpenAI', badge: 'OpenAI' },
-  { id: 'gpt-5', name: 'GPT-5', provider: 'openai', desc: '\u0ec3\u0eab\u0ea1\u0ec8\u0ea5\u0ec8\u0eb2\u0eaa\u0eb8\u0e94! \u0ec1\u0e81\u0ec9\u0e9b\u0eb1\u0e8d\u0eab\u0eb2\u0ec4\u0e94\u0ec9\u0ec0\u0e81\u0ec8\u0e87\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94', badge: 'OpenAI' },
-  { id: 'gpt-5.5', name: 'GPT-5.5', provider: 'openai', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0e81\u0eb2\u0e99\u0e84\u0eb4\u0e94\u0e9e\u0edd\u0e99\u0e97\u0eb2\u0e99\u0eb5\u0ec4\u0ea7\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94', badge: 'OpenAI' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', desc: 'ໄວ ແລະ ປະຢັດ ຂອງ OpenAI', badge: 'OpenAI' },
+  { id: 'gpt-5.5-instant', name: 'GPT-5.5 Instant', provider: 'openai', desc: 'ໃຫມ່! ຕອບສະໜອງໄວທันໃຈ', badge: 'OpenAI' },
+  { id: 'gpt-5.5-thinking', name: 'GPT-5.5 Thinking', provider: 'openai', desc: 'ໃຫມ່ລ່າສຸດ! ເນັ້ນການຄິດຫາເຫດຜົນແບບເລິກເຊິ່ງ', badge: 'OpenAI' },
+  { id: 'gpt-5.5-pro', name: 'GPT-5.5 Pro', provider: 'openai', desc: 'ໃຫມ່ລ່າສຸດ! ປະສິດທິພາບສູງສຸດລະດັບມືອາຊີບ', badge: 'OpenAI' },
   // ─── Anthropic Claude ───
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', provider: 'anthropic', desc: '\u0e84\u0eb4\u0e94\u0ea7\u0eb4\u0ec0\u0e84\u0eb2\u0eb0\u0e94\u0eb5\u0ec0\u0ea5\u0eb5\u0e94 \u0e82\u0ead\u0e87 Anthropic', badge: 'Claude' },
-  { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0ec0\u0e81\u0eb1\u0ec8\u0e87 \u0ec4\u0ea7 \u0e9c\u0eb0\u0ea5\u0e97\u0ee4\u0e94\u0e94\u0eb5', badge: 'Claude' },
-  { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic', desc: '\u0ec3\u0eab\u0ea1\u0ec8! \u0ec0\u0e81\u0eb1\u0ec8\u0e87\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94 \u0ea7\u0eb4\u0ec0\u0e84\u0eb2\u0eb0\u0e9c\u0eb0\u0ea5 \u0ec0\u0e81\u0eb1\u0ec8\u0e87\u0ec0\u0ea5\u0eb5\u0e94', badge: 'Claude' },
-  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', provider: 'anthropic', desc: '\u0ec3\u0eab\u0ea1\u0ec8\u0ea5\u0ec8\u0eb2\u0eaa\u0eb8\u0e94! Adaptive Reasoning \u0eaa\u0eb0\u0eab\u0ebc\u0eb2\u0e94\u0e97\u0eb5\u0ec8\u0eaa\u0eb8\u0e94', badge: 'Claude' },
+  { id: 'claude-haiku-4.5', name: 'Claude 4.5 Haiku', provider: 'anthropic', desc: 'ໄວ ແລະ ປະຢັດ ຂອງ Anthropic', badge: 'Claude' },
+  { id: 'claude-sonnet-4.6', name: 'Claude 4.6 Sonnet', provider: 'anthropic', desc: 'ໃຫມ່! ປະສິດທິພາບດີເລີດ & ເຮັດວຽກເປັນລະບົບ', badge: 'Claude' },
+  { id: 'claude-opus-4.8', name: 'Claude Opus 4.8', provider: 'anthropic', desc: 'ໃຫມ່! ໂມເດວຄິດຫາເຫດຜົນລະດັບສູງ', badge: 'Claude' },
+  { id: 'claude-fable-5', name: 'Claude 5 Fable', provider: 'anthropic', desc: 'ໃຫມ່ລ່າສຸດ! ໂມເດວ Mythos-class ທີ່ສະຫຼາດທີ່ສຸດ', badge: 'Claude' },
 ];
 
 function ModelSelect({ value, onChange }) {
