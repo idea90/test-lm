@@ -69,7 +69,8 @@ const MODELS = [
   // ─── Google Gemini ───
   { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', desc: 'ໄວ ແລະ ປະຢັດ (ແນະນຳ)', badge: 'Gemini' },
   { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', provider: 'gemini', desc: 'ໃຫມ່! ໄວ ແລະ ສະຫຼາດຂຶ້ນ', badge: 'Gemini' },
-  { id: 'gemini-3.5-pro', name: 'Gemini 3.5 Pro', provider: 'gemini', desc: 'ໃຫມ່ລ່າສຸດ! ປະສິດທິພາບສູງສຸດ & ວຽກຊັບຊ້ອນ', badge: 'Gemini' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', desc: 'ປະສິດທິພາບສູງ & ວຽກຊັບຊ້ອນ', badge: 'Gemini' },
+  { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', provider: 'gemini', desc: 'ໃຫມ່! ປະສິດທິພາບສູງ & ຜະລິດຖຶດີເລີດ', badge: 'Gemini' },
   // ─── OpenAI ───
   { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', desc: 'ໄວ ແລະ ປະຢັດ ຂອງ OpenAI', badge: 'OpenAI' },
   { id: 'gpt-5.5-instant', name: 'GPT-5.5 Instant', provider: 'openai', desc: 'ໃຫມ່! ຕອບສະໜອງໄວທันໃຈ', badge: 'OpenAI' },
@@ -79,7 +80,7 @@ const MODELS = [
   { id: 'claude-haiku-4.5', name: 'Claude 4.5 Haiku', provider: 'anthropic', desc: 'ໄວ ແລະ ປະຢັດ ຂອງ Anthropic', badge: 'Claude' },
   { id: 'claude-sonnet-4.6', name: 'Claude 4.6 Sonnet', provider: 'anthropic', desc: 'ໃຫມ່! ປະສິດທິພາບດີເລີດ & ເຮັດວຽກເປັນລະບົບ', badge: 'Claude' },
   { id: 'claude-opus-4.8', name: 'Claude Opus 4.8', provider: 'anthropic', desc: 'ໃຫມ່! ໂມເດວຄິດຫາເຫດຜົນລະດັບສູງ', badge: 'Claude' },
-  { id: 'claude-fable-5', name: 'Claude 5 Fable', provider: 'anthropic', desc: 'ໃຫມ່ລ່າສຸດ! ໂມເດວ Mythos-class ທີ່ສະຫຼາດທີ່ສຸດ', badge: 'Claude' },
+
 ];
 
 function ModelSelect({ value, onChange }) {
