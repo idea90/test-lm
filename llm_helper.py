@@ -12,16 +12,53 @@ def generate_test_questions(model_name, context_text, num_questions, difficulty_
         
     if model_name.startswith('gemini'):
         # Pass directly to gemini_helper
-        return gemini_helper.generate_test_questions(
+        data, token_count = gemini_helper.generate_test_questions(
             context_text, num_questions, difficulty_lao, question_type, 
             custom_instructions, num_options, language, api_key=api_keys.get('gemini')
         )
     elif model_name.startswith('gpt'):
-        return _generate_openai(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('openai'))
+        data, token_count = _generate_openai(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('openai'))
     elif model_name.startswith('claude'):
-        return _generate_anthropic(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('anthropic'))
+        data, token_count = _generate_anthropic(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('anthropic'))
     else:
         raise ValueError(f"ບໍ່ຮອງຮັບໂມເດວ: {model_name}")
+
+    data = _enforce_question_format(data, question_type)
+    return data, token_count
+
+def _enforce_question_format(data, question_type):
+    questions = data.get('questions', [])
+    if not questions:
+        return data
+
+    if question_type == 'short_answer':
+        to_blank = questions
+    elif question_type == 'mixed':
+        midpoint = len(questions) // 2
+        to_blank = questions[midpoint:]
+    else:
+        to_blank = []
+
+    for q in to_blank:
+        correct_key = q.get('correct_option', '').lower()
+        if correct_key in ['a', 'b', 'c', 'd']:
+            correct_text = (q.get(f'option_{correct_key}') or '').strip()
+            explanation = (q.get('explanation') or '').strip()
+            
+            if correct_text and correct_text.lower() not in explanation.lower():
+                if correct_text.lower() not in ['a', 'b', 'c', 'd', 'ກ', 'ຂ', 'ຄ', 'ງ', 'n/a', '-', 'none', 'null', 'undefined', 'ບໍ່ມີ', 'ຫວ່າງ']:
+                    if explanation:
+                        q['explanation'] = f"ຄຳຕອບ: {correct_text}\nອະທິບາຍ: {explanation}"
+                    else:
+                        q['explanation'] = f"ຄຳຕອບ: {correct_text}"
+        
+        q['option_a'] = ''
+        q['option_b'] = ''
+        q['option_c'] = ''
+        q['option_d'] = ''
+        q['correct_option'] = 'A'
+
+    return data
 
 def generate_chat_response(model_name, chat_history, new_message, context_text, api_keys=None):
     if api_keys is None:

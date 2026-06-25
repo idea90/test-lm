@@ -156,8 +156,26 @@
 
 
 [data-theme="dark"] .exam-paper {
-  background: #1D1B20;
+  background: linear-gradient(to bottom, #25232a, #1d1b20);
   color: #E6E0E9;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 
+    0 1px 3px rgba(0,0,0,0.2),
+    0 12px 28px rgba(0,0,0,0.35),
+    0 24px 48px rgba(0,0,0,0.25),
+    0 1px 0px rgba(255,255,255,0.05) inset;
+}
+
+[data-theme="dark"] .exam-paper::before {
+  background: linear-gradient(to bottom, #211f26, #1a181d);
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+[data-theme="dark"] .exam-paper::after {
+  background: linear-gradient(to bottom, #1d1c21, #16151a);
+  border-color: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.25);
 }
 [data-theme="dark"] .exam-paper-header {
   border-bottom-color: #49454F;
@@ -573,15 +591,23 @@ body {
 
 /* The A4-like paper */
 .exam-paper {
-  background: white;
-  border-radius: var(--shape-md);
-  box-shadow: var(--elevation-2);
-  padding: 48px 48px 40px;
-  color: #1D1B20;
-  font-size: 13px;
-  line-height: 1.7;
+  background: #ffffff;
+  border-radius: 12px;
+  /* Optimized premium shadow for better scroll performance */
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 10px 15px -3px rgba(0, 0, 0, 0.05),
+    0 0 0 1px rgba(0, 0, 0, 0.02);
+  padding: 56px 56px 48px;
+  color: #2b2b2b;
+  font-size: 13.5px;
+  line-height: 1.75;
   position: relative;
+  /* Move to a composite layer to prevent paint stutter on scroll */
+  transform: translateZ(0);
 }
+
+/* Removed heavy rotated pseudo-elements to eliminate scroll jank */
 
 .exam-paper-header-official {
   margin-bottom: 24px;
@@ -597,16 +623,66 @@ body {
   text-align: center; font-size: 18px; margin-bottom: 16px; margin-top: 16px;
 }
 .inline-input {
-  border: none; border-bottom: 1px dotted #999; background: transparent;
-  font-family: inherit; font-size: inherit; color: inherit; outline: none; padding: 2px 4px;
-  display: inline-block; vertical-align: baseline;
-  transition: border-color 0.15s, background 0.15s;
+  border: none; 
+  border-bottom: 1px dashed rgba(0,0,0,0.25); 
+  background: transparent;
+  font-family: inherit; 
+  font-size: inherit; 
+  color: inherit; 
+  outline: none; 
+  padding: 2px 6px;
+  display: inline-block; 
+  vertical-align: baseline;
+  border-radius: 4px;
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
 }
-.inline-input:hover { border-bottom-color: #555; background: rgba(0,0,0,0.03); border-radius: 3px; }
-.inline-input:focus { border-bottom-color: var(--md-primary); background: rgba(103,80,164,0.05); border-radius: 3px; }
-textarea.inline-input { display: block; width: 100%; border-bottom: none; border: 1px solid transparent; border-radius: 4px; line-height: 1.5; }
-textarea.inline-input:hover { border: 1px solid #bbb; background: rgba(0,0,0,0.02); }
-textarea.inline-input:focus { border: 1px solid var(--md-primary); background: rgba(103,80,164,0.04); }
+.inline-input:hover { 
+  border-bottom-color: rgba(0,0,0,0.6); 
+  background: rgba(0,0,0,0.02); 
+}
+.inline-input:focus { 
+  border-bottom-color: var(--md-primary); 
+  background: rgba(103,80,164,0.03); 
+  box-shadow: 0 1px 0 var(--md-primary);
+}
+[data-theme="dark"] .inline-input {
+  border-bottom-color: rgba(255,255,255,0.25);
+}
+[data-theme="dark"] .inline-input:hover {
+  border-bottom-color: rgba(255,255,255,0.5);
+  background: rgba(255,255,255,0.02);
+}
+[data-theme="dark"] .inline-input:focus {
+  border-bottom-color: var(--md-primary);
+  background: rgba(255,255,255,0.03);
+  box-shadow: 0 1px 0 var(--md-primary);
+}
+textarea.inline-input { 
+  display: block; 
+  width: 100%; 
+  border: 1px solid transparent; 
+  border-radius: 6px; 
+  line-height: 1.5; 
+  transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+textarea.inline-input:hover { 
+  border-color: rgba(0,0,0,0.15); 
+  background: rgba(0,0,0,0.01); 
+}
+textarea.inline-input:focus { 
+  border-color: var(--md-primary); 
+  background: rgba(103,80,164,0.02); 
+  box-shadow: 0 0 0 1px var(--md-primary);
+}
+[data-theme="dark"] textarea.inline-input:hover { 
+  border-color: rgba(255,255,255,0.15); 
+  background: rgba(255,255,255,0.01); 
+}
+[data-theme="dark"] textarea.inline-input:focus { 
+  border-color: var(--md-primary); 
+  background: rgba(255,255,255,0.02); 
+  box-shadow: 0 0 0 1px var(--md-primary);
+}
 .student-info-table {
   width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px;
 }
@@ -628,11 +704,14 @@ textarea.inline-input:focus { border: 1px solid var(--md-primary); background: r
 }
 
 .exam-question {
-  margin-bottom: 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #ECE6F0;
+  margin-bottom: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px dashed rgba(103, 80, 164, 0.12);
 }
 .exam-question:last-child { border-bottom: none; }
+[data-theme="dark"] .exam-question {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
 
 .exam-q-row {
   display: flex;

@@ -26,6 +26,9 @@ const I = ({ name, size = 20, style }: { name: string; size?: number; style?: Re
     moon: 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z',
     sun: 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 5a7 7 0 100 14 7 7 0 000-14z',
     warning: 'M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4M12 17h.01',
+    'book-open': 'M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z',
+    'check-circle': 'M22 11.08V12a10 10 0 1 1-5.93-9.14 M22 4L12 14.01l-3-3',
+    'arrow-left': 'M19 12H5 M12 19l-7-7 7-7',
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
@@ -753,17 +756,16 @@ export default function App() {
                       <div className="lao-motto">
                         <textarea
                           className="inline-input"
-                          value={previewMotto}
-                          onChange={e => setPreviewMotto(e.target.value)}
+                          defaultValue={previewMotto}
+                          onBlur={e => setPreviewMotto(e.target.value)}
                           rows={3}
                           style={{ width: '100%', textAlign: 'center', resize: 'none', fontSize: '14px', fontFamily: "'Times New Roman', serif", lineHeight: 1.4 }}
                         />
                       </div>
 
-                      {/* School row */}
                       <div className="school-row">
-                        <div style={{ flex: 1 }}>ໂຮງຮຽນ: <input className="inline-input" value={previewSchool} onChange={e => setPreviewSchool(e.target.value)} style={{ width: '180px' }} /></div>
-                        <div>ເລກທີ: <input className="inline-input" value={previewExamNo} onChange={e => setPreviewExamNo(e.target.value)} style={{ width: '80px' }} /></div>
+                        <div style={{ flex: 1 }}>ໂຮງຮຽນ: <input className="inline-input" defaultValue={previewSchool} onBlur={e => setPreviewSchool(e.target.value)} style={{ width: '180px' }} /></div>
+                        <div>ເລກທີ: <input className="inline-input" defaultValue={previewExamNo} onBlur={e => setPreviewExamNo(e.target.value)} style={{ width: '80px' }} /></div>
                       </div>
 
                       {/* Title */}
@@ -771,15 +773,14 @@ export default function App() {
                         <strong>ຫົວບົດສອບເສັງ: <input
                           className="inline-input"
                           style={{ width: '300px', fontWeight: 'bold', fontSize: '16px' }}
-                          value={previewTitle || activeTest.title}
-                          onChange={e => setPreviewTitle(e.target.value)}
+                          defaultValue={previewTitle || activeTest.title}
+                          onBlur={e => setPreviewTitle(e.target.value)}
                         /></strong>
                       </div>
 
-                      {/* Subject & Time */}
                       <div className="subject-time-row">
-                        <div style={{ flex: 1 }}>ວິຊາ: <input className="inline-input" value={previewSubject} onChange={e => setPreviewSubject(e.target.value)} style={{ width: '180px' }} /></div>
-                        <div>ເວລາ: <input className="inline-input" value={previewTime} onChange={e => setPreviewTime(e.target.value)} style={{ width: '50px', textAlign: 'center' }} /> ນາທີ</div>
+                        <div style={{ flex: 1 }}>ວິຊາ: <input className="inline-input" defaultValue={previewSubject} onBlur={e => setPreviewSubject(e.target.value)} style={{ width: '180px' }} /></div>
+                        <div>ເວລາ: <input className="inline-input" defaultValue={previewTime} onBlur={e => setPreviewTime(e.target.value)} style={{ width: '50px', textAlign: 'center' }} /> ນາທີ</div>
                       </div>
 
                       {/* Student table — labels editable */}
@@ -812,11 +813,11 @@ export default function App() {
                               <>
                                 <div className="exam-instructions-official">
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', alignItems: 'center' }}>
-                                    <input className="inline-input" value={previewSection} onChange={e => setPreviewSection(e.target.value)} style={{ fontWeight: 'bold', width: '200px' }} />
-                                    <span>ຄະແນນພາກປາລະໄນ: <input className="inline-input" type="number" value={previewTotalScore} onChange={e => setPreviewTotalScore(Number(e.target.value) || 0)} style={{ width: '50px', textAlign: 'center', fontWeight: 'bold' }} /> ຂໍ້</span>
+                                    <input className="inline-input" defaultValue={previewSection} onBlur={e => setPreviewSection(e.target.value)} style={{ fontWeight: 'bold', width: '200px' }} />
+                                    <span>ຄະແນນພາກປາລະໄນ: <input className="inline-input" type="number" defaultValue={previewTotalScore} onBlur={e => setPreviewTotalScore(Number(e.target.value) || 0)} style={{ width: '50px', textAlign: 'center', fontWeight: 'bold' }} /> ຂໍ້</span>
                                   </div>
                                   <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-                                    <textarea className="inline-input" value={previewInstructions} onChange={e => setPreviewInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
+                                    <textarea className="inline-input" defaultValue={previewInstructions} onBlur={e => setPreviewInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
                                     <span style={{ whiteSpace: 'nowrap' }}>(ຂໍ້ລະ {(previewTotalScore / objQs.length).toFixed(2)})</span>
                                   </div>
                                 </div>
@@ -870,7 +871,7 @@ export default function App() {
                                     <span>ຄະແນນພາກອັດຕະໄນ ....................</span>
                                   </div>
                                   <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
-                                    <textarea className="inline-input" value={previewSubjInstructions} onChange={e => setPreviewSubjInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
+                                    <textarea className="inline-input" defaultValue={previewSubjInstructions} onBlur={e => setPreviewSubjInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
                                   </div>
                                 </div>
                                 {subjQs.map((q) => {
@@ -918,15 +919,39 @@ export default function App() {
                 )}
               </div>
             ) : (
-              <div className="center-empty animate-in">
-                <div className="center-empty-icon"><I name="wand" size={44} /></div>
-                <h2>ສ້າງບົດສອບເສັງ</h2>
-                <p>{selSources.length > 0 ? `ແຫຼ່ງ: "${selSources.map(s => s.filename).join(', ')}" — ກົດ "ສ້າງບົດສອບເສັງ" ທາງເທິງ` : 'ເລືອກໄຟລ໌ ທາງຊ້າຍ ແລ້ວກົດ "ສ້າງບົດສອບເສັງ"'}</p>
-                {selSources.length === 0 && (
-                  <button className="md-btn-tonal" style={{ width: 'auto', padding: '10px 24px', marginTop: 20 }} onClick={() => fileRef.current?.click()}>
-                    <I name="upload" size={16} /> ອັບໂຫລດໄຟລ໌ບົດຮຽນ
-                  </button>
-                )}
+              <div className="center-empty animate-in" style={{ maxWidth: '640px', margin: '40px auto', textAlign: 'center' }}>
+                <div className="center-empty-icon" style={{ background: 'linear-gradient(135deg, var(--md-primary), var(--md-tertiary))', color: '#fff', boxShadow: '0 8px 32px rgba(0,0,0,0.15)', width: '88px', height: '88px', margin: '0 auto 24px' }}>
+                  <I name="book-open" size={40} />
+                </div>
+                <h1 style={{ fontSize: '36px', fontWeight: '800', marginBottom: '16px', background: 'linear-gradient(90deg, var(--md-primary), var(--md-tertiary))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', letterSpacing: '-0.5px' }}>
+                  ຍິນດີຕ້ອນຮັບສູ່ Test LM
+                </h1>
+                <p style={{ fontSize: '16px', color: 'var(--md-on-surface-variant)', lineHeight: '1.7', marginBottom: '32px' }}>
+                  ຜູ້ຊ່ວຍອັດສະລິຍະສຳລັບຄູອາຈານ. ປ່ຽນເອກະສານບົດຮຽນຂອງທ່ານໃຫ້ກາຍເປັນຊຸດບົດສອບເສັງທີ່ສົມບູນແບບ, ພ້ອມດ້ວຍຄຳສະເລີຍ ແລະ ຄຳອະທິບາຍ ພາຍໃນບໍ່ເທົ່າໃດວິນາທີ!
+                </p>
+                
+                <div style={{ background: 'var(--md-surface-variant)', padding: '28px', borderRadius: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', border: '1px solid rgba(0,0,0,0.05)' }}>
+                  {selSources.length > 0 ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--md-primary)', fontWeight: '600', fontSize: '15px' }}>
+                        <I name="check-circle" size={20} />
+                        ເລືອກແລ້ວ {selSources.length} ໄຟລ໌: {selSources.map(s => s.filename).join(', ')}
+                      </div>
+                      <p style={{ fontSize: '14px', color: 'var(--md-on-surface-variant)', margin: 0 }}>ພ້ອມແລ້ວ! ກົດປຸ່ມ <strong style={{ color: 'var(--md-on-surface)' }}>"ສ້າງບົດສອບເສັງ"</strong> ຢູ່ແຖບດ້ານເທິງເພື່ອເລີ່ມຕົ້ນ.</p>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <I name="arrow-left" size={20} style={{ color: 'var(--md-primary)', animation: 'pulse 2s infinite' }} />
+                        <span style={{ fontSize: '15px', color: 'var(--md-on-surface)', fontWeight: '600' }}>ເລືອກໄຟລ໌ບົດຮຽນຈາກແຖບດ້ານຊ້າຍມືເພື່ອເລີ່ມຕົ້ນ</span>
+                      </div>
+                      <span style={{ fontSize: '13px', color: 'var(--md-on-surface-variant)', margin: '-8px 0 0' }}>ຫຼື ອັບໂຫລດໄຟລ໌ໃໝ່ຂອງທ່ານເອງ:</span>
+                      <button className="md-btn" style={{ padding: '0 28px', height: '44px', borderRadius: '22px', marginTop: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} onClick={() => fileRef.current?.click()}>
+                        <I name="upload" size={18} style={{ marginRight: '8px' }} /> ອັບໂຫລດໄຟລ໌ບົດຮຽນ
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1167,6 +1192,25 @@ export default function App() {
               <p style={{ marginBottom: 16 }}>
                 ໄຟລ໌ມີທັງໝົດ <strong style={{ color: 'var(--md-primary)' }}>{rangeDialogPages}</strong> ໜ້າ. ເລືອກຊ່ວງໜ້າທີ່ຕ້ອງການດຶງຂໍ້ມູນ:
               </p>
+              
+              {(rangeDialogEnd - rangeDialogStart + 1 > 100) && (
+                <div style={{
+                  background: 'rgba(230, 126, 34, 0.1)',
+                  border: '1px solid rgba(230, 126, 34, 0.4)',
+                  color: 'var(--md-on-surface)',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  gap: '8px',
+                  alignItems: 'flex-start'
+                }}>
+                  <span style={{ fontSize: '18px', lineHeight: 1 }}>⚠️</span>
+                  <div style={{ fontSize: '12px', lineHeight: '1.4' }}>
+                    <strong>ຄຳແນະນຳຄວາມໄວ:</strong> ການເລືອກຫຼາຍກວ່າ 100 ໜ້າ ອາດເຮັດໃຫ້ການປະມວນຜົນຊ້າ. ແນະນຳໃຫ້ເລືອກຊ່ວງໜ້າທີ່ນ້ອຍລົງ (ບໍ່ເກີນ 30-50 ໜ້າ) ເພື່ອຄວາມໄວ ແລະ ຄວາມຖືກຕ້ອງສູງສຸດຂອງ AI.
+                  </div>
+                </div>
+              )}
               
               <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                 <div className="md-field" style={{ flex: 1, marginBottom: 0 }}>

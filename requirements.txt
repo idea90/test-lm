@@ -6,3 +6,8 @@ pydantic
 pypdf
 python-docx
 python-dotenv
+pytesseract
+pdf2image
+Pillow
+werkzeug
+itsdangerous

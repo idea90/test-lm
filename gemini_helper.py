@@ -10,16 +10,40 @@ load_dotenv()
 # Define Pydantic schema for structured output
 class QuestionSchema(BaseModel):
     question_text: str = Field(description="The question text in Lao language, based strictly on the text context.")
-    option_a: str = Field(description="Option A text in Lao. Must start with the text content itself (do not prepend 'ກ.' or 'A.').")
-    option_b: str = Field(description="Option B text in Lao. Must start with the text content itself (do not prepend 'ຂ.' or 'B.').")
-    option_c: str = Field(description="Option C text in Lao. Must start with the text content itself (do not prepend 'ຄ.' or 'C.').")
-    option_d: str = Field(description="Option D text in Lao. Must start with the text content itself (do not prepend 'ງ.' or 'D.').")
-    correct_option: str = Field(description="The correct option key. Must be exactly 'A', 'B', 'C', or 'D'.")
-    explanation: str = Field(description="Short explanation in Lao explaining why this option is correct based on the lesson context.")
+    option_a: str = Field(description="Option A text. For multiple choice, must start with the option text itself (do not prepend 'ກ.' or 'A.'). For subjective/essay questions, this MUST be an empty string (\"\").")
+    option_b: str = Field(description="Option B text. For multiple choice, must start with the option text itself. For subjective/essay questions, this MUST be an empty string (\"\").")
+    option_c: str = Field(description="Option C text. For multiple choice, must start with the option text itself. For subjective/essay questions, this MUST be an empty string (\"\").")
+    option_d: str = Field(description="Option D text. For multiple choice, must start with the option text itself. For subjective/essay questions, this MUST be an empty string (\"\").")
+    correct_option: str = Field(description="The correct option key. Must be exactly 'A', 'B', 'C', or 'D'. For subjective/essay, set this to 'A'.")
+    explanation: str = Field(description="Lao explanation for why the option is correct, or the detailed model answer/guidelines for subjective questions.")
 
 class TestSchema(BaseModel):
     title: str = Field(description="A suitable, professional title for the test in Lao language based on the topic.")
     questions: list[QuestionSchema]
+
+def optimize_context_text(text, max_chars=60000):
+    if not text or len(text) <= max_chars:
+        return text or ""
+    
+    print(f"Optimizing large context text of size {len(text)} chars (limit: {max_chars} chars)...")
+    # Take chunks from the beginning, middle, and end to ensure broad coverage
+    chunk_size = max_chars // 3
+    
+    start_chunk = text[:chunk_size]
+    
+    mid_start = len(text) // 2 - chunk_size // 2
+    mid_chunk = text[mid_start:mid_start + chunk_size]
+    
+    end_chunk = text[-chunk_size:]
+    
+    optimized_text = (
+        f"{start_chunk}\n\n"
+        f"... [ເນື້ອຫາບາງສ່ວນຖືກຍໍ້ເພື່ອຄວາມໄວໃນການປະມວນຜົນ / Content truncated for processing speed] ...\n\n"
+        f"{mid_chunk}\n\n"
+        f"... [ເນື້ອຫາບາງສ່ວນຖືກຍໍ້ເພື່ອຄວາມໄວໃນການປະມວນຜົນ / Content truncated for processing speed] ...\n\n"
+        f"{end_chunk}"
+    )
+    return optimized_text
 
 def get_client(api_key=None):
     """
@@ -35,6 +59,7 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
     """
     Generate test questions based on the lesson content, supporting multiple formats and custom instructions.
     """
+    context_text = optimize_context_text(context_text)
     client = get_client(api_key)
     
     # Map difficulty levels to instructions
@@ -74,6 +99,11 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
        * Options 'option_a', 'option_b', 'option_c', and 'option_d' MUST all be empty strings ("").
        * The correct expected model answer MUST be provided inside the 'explanation' field (e.g. 'ຄຳຕອບທີ່ຖືກຕ້ອງແມ່ນ: [expected answer]').
        * 'correct_option' should be set to 'A' (as a placeholder)."""
+    elif question_type == 'mixed':
+        format_instructions = """5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
+       * Roughly half of the questions should be Multiple Choice (options A, B, C, D are provided, and correct_option is one of A, B, C, or D).
+       * The other half of the questions should be Short Answer/Essay questions (options 'option_a', 'option_b', 'option_c', and 'option_d' MUST ALL be empty strings "", and the correct expected answer guidelines/description MUST be provided in the 'explanation' field).
+       * 'correct_option' for Short Answer/Essay questions should be set to 'A' (as a placeholder)."""
     else: # default multiple_choice
         format_instructions = f"5. Format: Standard multiple choice. {options_instruction} Ensure there is only one correct answer."
 
@@ -120,6 +150,7 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
     
     try:
         data = json.loads(response.text)
+        
         return data, token_count
     except Exception as e:
         # Fallback if parsing fails (highly unlikely with Structured Outputs)
@@ -131,6 +162,7 @@ def generate_chat_response(chat_history, new_message, context_text, api_key=None
     """
     Generate chat response in Lao using the lesson context.
     """
+    context_text = optimize_context_text(context_text)
     client = get_client(api_key)
     
     system_instruction = f"""

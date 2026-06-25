@@ -1,4 +1,11 @@
 {
+  "scripts": {
+    "start": "npm --prefix frontend start",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "prod": "npm --prefix frontend run prod",
+    "lint": "npm --prefix frontend run lint"
+  },
   "dependencies": {
     "autoskill": "^0.1.0"
   }

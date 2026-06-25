@@ -249,27 +249,40 @@ def generate_docx_file(test_data):
 # Auth Routes
 @app.post("/api/auth/register")
 async def register(request: Request):
-    data = await request.json()
+    import re
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "ຮູບແບບຂໍ້ມູນບໍ່ຖືກຕ້ອງ (Invalid JSON)"})
+        
     if not data or 'username' not in data or 'password' not in data:
         return JSONResponse(status_code=400, content={"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"})
     
+    # Validate types
+    if not isinstance(data['username'], str) or not isinstance(data['password'], str):
+        return JSONResponse(status_code=400, content={"error": "ປະເພດຂໍ້ມູນບໍ່ຖືກຕ້ອງ"})
+        
     username = data['username'].strip()
     password = data['password']
     
     if not username or not password:
         return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ສາມາດຫວ່າງເປົ່າໄດ້"})
         
-    if len(username) < 3:
-        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ຕ້ອງມີຢ່າງໜ້ອຍ 3 ຕົວອັກសອນ"})
+    if len(username) < 3 or len(username) > 30:
+        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ຕ້ອງມີຄວາມຍາວລະຫວ່າງ 3 ຫາ 30 ຕົວອັກສອນ"})
         
-    if len(password) < 4:
-        return JSONResponse(status_code=400, content={"error": "ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 4 ຕົວອັກសອນ"})
+    if len(password) < 4 or len(password) > 128:
+        return JSONResponse(status_code=400, content={"error": "ລະຫັດຜ່ານຕ້ອງມີຄວາມຍາວລະຫວ່າງ 4 ຫາ 128 ຕົວອັກສອນ"})
         
-    existing_user = database.get_user_by_username(username)
-    if existing_user:
-        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ນີ້ຖືກໃຊ້ໄປແລ້ວ"})
+    # Username character whitelist (alphanumeric, underscore, hyphen)
+    if not re.match(r"^[a-zA-Z0-9_-]+$", username):
+        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ຕ້ອງມີສະເພາະຕົວອັກສອນພາສາອັງກິດ, ຕົວເລກ, ຂີດກາງ (-) ແລະ ຂີດກ້ອງ (_) ເທົ່ານັ້ນ"})
         
     try:
+        existing_user = database.get_user_by_username(username)
+        if existing_user:
+            return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ນີ້ຖືກໃຊ້ໄປແລ້ວ"})
+            
         password_hash = generate_password_hash(password)
         user_id = database.create_user(username, password_hash)
         if user_id:
@@ -280,16 +293,27 @@ async def register(request: Request):
         else:
             return JSONResponse(status_code=500, content={"error": "ບໍ່ສາມາດສ້າງບັນຊີໄດ້"})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"Registration error: {e}")
+        return JSONResponse(status_code=500, content={"error": "ເກີດຂໍ້ຜິດພາດໃນການເຊື່ອມຕໍ່ຖານຂໍ້ມູນ"})
 
 @app.post("/api/auth/login")
 async def login(request: Request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "ຮູບແບບຂໍ້ມູນບໍ່ຖືກຕ້ອງ (Invalid JSON)"})
+        
     if not data or 'username' not in data or 'password' not in data:
-        return JSONResponse(status_code=400, content={"error": "ข้อมูลບໍ່ຄົບຖ້ວນ"})
+        return JSONResponse(status_code=400, content={"error": "ຂໍ້ມູນບໍ່ຄົບຖ້ວນ"})
+        
+    if not isinstance(data['username'], str) or not isinstance(data['password'], str):
+        return JSONResponse(status_code=400, content={"error": "ປະເພດຂໍ້ມູນບໍ່ຖືກຕ້ອງ"})
         
     username = data['username'].strip()
     password = data['password']
+    
+    if not username or not password:
+        return JSONResponse(status_code=400, content={"error": "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ສາມາດຫວ່າງເປົ່າໄດ້"})
     
     try:
         user = database.get_user_by_username(username)
@@ -308,7 +332,8 @@ async def login(request: Request):
             "profile_pic": profile_pic
         }
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"Login error: {e}")
+        return JSONResponse(status_code=500, content={"error": "ເກີດຂໍ້ຜິດພາດໃນລະບົບ"})
 
 @app.post("/api/auth/guest")
 async def guest_login(request: Request):
@@ -337,29 +362,41 @@ async def guest_login(request: Request):
             "is_guest": True
         }
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        print(f"Guest login error: {e}")
+        return JSONResponse(status_code=500, content={"error": "ເກີດຂໍ້ຜິດພາດໃນລະບົບ"})
 
 @app.post("/api/auth/logout")
 async def logout(request: Request):
-    request.session.clear()
-    return {"message": "ອອກຈາກລະບົບສຳເລັດ"}
+    try:
+        request.session.clear()
+        return {"message": "ອອກຈາກລະບົບສຳເລັດ"}
+    except Exception as e:
+        print(f"Logout error: {e}")
+        return JSONResponse(status_code=500, content={"error": "ເກີດຂໍ້ຜິດພາດໃນລະບົບ"})
 
 @app.get("/api/auth/me")
 async def get_me(request: Request):
-    user_id = get_current_user(request)
-    if user_id:
-        user = database.get_user_by_id(user_id)
-        profile_pic = None
-        if user:
-            profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={request.session['username']}&background=random"
-        return {
-            "logged_in": True,
-            "user_id": user_id,
-            "username": request.session['username'],
-            "is_guest": request.session.get('is_guest', False),
-            "profile_pic": profile_pic
-        }
-    return {"logged_in": False}
+    try:
+        user_id = get_current_user(request)
+        if user_id:
+            user = database.get_user_by_id(user_id)
+            if user:
+                username = user['username']
+                profile_pic = user.get('profile_pic') or f"https://ui-avatars.com/api/?name={username}&background=random"
+                return {
+                    "logged_in": True,
+                    "user_id": user_id,
+                    "username": username,
+                    "is_guest": request.session.get('is_guest', False),
+                    "profile_pic": profile_pic
+                }
+            else:
+                # If session has user_id but user no longer exists in DB, clean the session
+                request.session.clear()
+        return {"logged_in": False}
+    except Exception as e:
+        print(f"Get me error: {e}")
+        return {"logged_in": False}
 
 # User Profile pic & delete
 @app.post("/api/user/profile-pic")
@@ -678,7 +715,10 @@ async def generate_test(request: Request):
     except ValueError as ve:
         return JSONResponse(status_code=400, content={"error": str(ve)})
     except Exception as e:
-        print(f"Generation error: {e}")
+        import traceback
+        with open('error_log.txt', 'a', encoding='utf-8') as f:
+            f.write(f"Generate Test Error: {e}\n{traceback.format_exc()}\n\n")
+        print(f"Generate Test Error: {e}")
         return JSONResponse(status_code=500, content={"error": f"ເກີດຂໍ້ຜິດພາດໃນການສ້າງຄຳຖາມ: {str(e)}"})
 
 # Questions Edit/Delete
