@@ -229,6 +229,11 @@ body {
   padding: 6px 12px; cursor: pointer;
   font-size: 13px; font-weight: 500;
   transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 .rich-toolbar button:hover { background: var(--md-primary-container); color: var(--md-on-primary-container); border-color: var(--md-primary); }
 .rich-editor-content {
