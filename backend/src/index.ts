@@ -272,11 +272,11 @@ app.post('/api/sources/upload', upload.single('file'), async (req, res) => {
   }
 
   // Parse options
-  const pStart = parseInt(req.body.p_start || req.query.p_start || '1');
-  const pEndVal = req.body.p_end || req.query.p_end;
+  const pStart = parseInt(req.body.page_start || req.body.p_start || req.query.page_start || req.query.p_start || '1');
+  const pEndVal = req.body.page_end || req.body.p_end || req.query.page_end || req.query.p_end;
   const pEnd = pEndVal ? parseInt(pEndVal) : null;
   
-  const pExcludeVal = req.body.p_exclude || req.query.p_exclude || '';
+  const pExcludeVal = req.body.exclude_pages || req.body.p_exclude || req.query.exclude_pages || req.query.p_exclude || '';
   const pExclude = pExcludeVal
     ? pExcludeVal.split(',').map((x: string) => parseInt(x.trim())).filter((x: number) => !isNaN(x))
     : [];

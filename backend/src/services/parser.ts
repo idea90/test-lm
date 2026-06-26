@@ -81,9 +81,10 @@ export async function extractTextFromPdf(
   forceOcr = false
 ): Promise<string> {
   const excludeSet = new Set(excludePages);
+  const hasPageConstraints = pageStart > 1 || pageEnd !== null || excludePages.length > 0;
 
-  // If not forced, try pdf-parse first
-  if (!forceOcr) {
+  // If not forced and has no page constraints, try pdf-parse first
+  if (!forceOcr && !hasPageConstraints) {
     try {
       let pagesText: string[] = [];
       const options = {
