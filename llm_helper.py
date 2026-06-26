@@ -6,7 +6,7 @@ import gemini_helper
 
 load_dotenv()
 
-def generate_test_questions(model_name, context_text, num_questions, difficulty_lao, question_type='multiple_choice', custom_instructions='', num_options=4, language='lao', api_keys=None):
+def generate_test_questions(model_name, context_text, num_questions, difficulty_lao, question_type='multiple_choice', custom_instructions='', num_options=4, language='lao', api_keys=None, num_objective=None, num_subjective=None):
     if api_keys is None:
         api_keys = {}
         
@@ -14,19 +14,21 @@ def generate_test_questions(model_name, context_text, num_questions, difficulty_
         # Pass directly to gemini_helper
         data, token_count = gemini_helper.generate_test_questions(
             context_text, num_questions, difficulty_lao, question_type, 
-            custom_instructions, num_options, language, api_key=api_keys.get('gemini')
+            custom_instructions, num_options, language, api_key=api_keys.get('gemini'),
+            num_objective=num_objective, num_subjective=num_subjective,
+            model_name=model_name
         )
     elif model_name.startswith('gpt'):
-        data, token_count = _generate_openai(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('openai'))
+        data, token_count = _generate_openai(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('openai'), num_objective, num_subjective)
     elif model_name.startswith('claude'):
-        data, token_count = _generate_anthropic(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('anthropic'))
+        data, token_count = _generate_anthropic(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('anthropic'), num_objective, num_subjective)
     else:
         raise ValueError(f"ບໍ່ຮອງຮັບໂມເດວ: {model_name}")
 
-    data = _enforce_question_format(data, question_type)
+    data = _enforce_question_format(data, question_type, num_objective)
     return data, token_count
 
-def _enforce_question_format(data, question_type):
+def _enforce_question_format(data, question_type, num_objective=None):
     questions = data.get('questions', [])
     if not questions:
         return data
@@ -34,8 +36,11 @@ def _enforce_question_format(data, question_type):
     if question_type == 'short_answer':
         to_blank = questions
     elif question_type == 'mixed':
-        midpoint = len(questions) // 2
-        to_blank = questions[midpoint:]
+        if num_objective is not None:
+            to_blank = questions[num_objective:]
+        else:
+            midpoint = len(questions) // 2
+            to_blank = questions[midpoint:]
     else:
         to_blank = []
 
@@ -66,7 +71,8 @@ def generate_chat_response(model_name, chat_history, new_message, context_text, 
         
     if model_name.startswith('gemini'):
         return gemini_helper.generate_chat_response(
-            chat_history, new_message, context_text, api_key=api_keys.get('gemini')
+            chat_history, new_message, context_text, api_key=api_keys.get('gemini'),
+            model_name=model_name
         )
     elif model_name.startswith('gpt'):
         return _chat_openai(model_name, chat_history, new_message, context_text, api_keys.get('openai'))
@@ -75,7 +81,7 @@ def generate_chat_response(model_name, chat_history, new_message, context_text, 
     else:
         raise ValueError(f"ບໍ່ຮອງຮັບໂມເດວ: {model_name}")
 
-def _build_prompt(context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language):
+def _build_prompt(context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, num_objective=None, num_subjective=None):
     difficulty_map = {
         'easy': "Easy (ງ່າຍ) - Direct retrieval from the lesson text, simple definitions, and straightforward facts.",
         'medium': "Medium (ປານກາງ) - Requires understanding of the context, simple reasoning, or application of concepts from the lesson.",
@@ -110,13 +116,19 @@ def _build_prompt(context_text, num_questions, difficulty_lao, question_type, cu
        * The correct expected model answer MUST be provided inside the 'explanation' field.
        * 'correct_option' should be set to 'A' (as a placeholder)."""
     elif question_type == 'mixed':
-        format_instructions = """5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
+        if num_objective is not None and num_subjective is not None:
+            format_instructions = f"""5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
+       * The first {num_objective} questions MUST be Multiple Choice (options option_a, option_b, option_c, option_d are provided, and correct_option is one of A, B, C, or D).
+       * The next {num_subjective} questions MUST be Short Answer/Essay questions (options 'option_a', 'option_b', 'option_c', and 'option_d' MUST ALL be empty strings "", and the correct expected answer guidelines/description MUST be provided in the 'explanation' field).
+       * 'correct_option' for Short Answer/Essay questions should be set to 'A' (as a placeholder)."""
+        else:
+            format_instructions = """5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
        * Roughly half of the questions should be Multiple Choice (options A, B, C, D are provided, and correct_option is one of A, B, C, or D).
        * The other half of the questions should be Short Answer/Essay questions (options option_a, option_b, option_c, and option_d are ALL empty strings "", and the correct answer description is placed in the explanation field)."""
     else:
         format_instructions = f"5. Format: Standard multiple choice. {options_instruction} Ensure there is only one correct answer."
 
-    custom_ins_clause = f"\n7. ADDITIONAL INSTRUCTIONS: You MUST adhere to these custom instructions: {custom_instructions}" if custom_instructions else ""
+    custom_ins_clause = f"\n8. ADDITIONAL INSTRUCTIONS: You MUST adhere to these custom instructions: {custom_instructions}" if custom_instructions else ""
 
     return f"""
     You are an expert curriculum designer and teacher.
@@ -128,7 +140,8 @@ def _build_prompt(context_text, num_questions, difficulty_lao, question_type, cu
     3. Test Size: Generate exactly {num_questions} questions.
     4. Difficulty Level: The difficulty of the questions must be {difficulty_desc}.
     {format_instructions}
-    6. Explanations: Provide a clear and helpful explanation for why the correct option is right.{custom_ins_clause}
+    6. Explanations: Provide a clear and helpful explanation for why the correct option is right.
+    7. LaTeX Formatting: For math, science, or technical topics, you MUST format all mathematical expressions, chemical formulas, equations, and technical variables using LaTeX. Use single dollar signs $...$ for inline equations (e.g. $y = mx + c$) and double dollar signs $$...$$ for block/centered equations. Ensure the LaTeX syntax is clean and standard.{custom_ins_clause}
     
     LESSON CONTEXT:
     \"\"\"{context_text}\"\"\"
@@ -149,7 +162,7 @@ def _get_system_chat_instruction(context_text):
     \"\"\"{context_text}\"\"\"
     """
 
-def _generate_openai(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_key):
+def _generate_openai(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_key, num_objective=None, num_subjective=None):
     import openai
     from openai import OpenAI
     
@@ -158,7 +171,7 @@ def _generate_openai(model_name, context_text, num_questions, difficulty_lao, qu
         raise ValueError("ບໍ່ພົບ API Key ຂອງ OpenAI. ກະລຸນາຕັ້ງຄ່າ API Key ໃນສ່ວນການຕັ້ງຄ່າ.")
         
     client = OpenAI(api_key=key)
-    prompt = _build_prompt(context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language)
+    prompt = _build_prompt(context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, num_objective, num_subjective)
     
     try:
         completion = client.beta.chat.completions.parse(
@@ -206,7 +219,7 @@ def _chat_openai(model_name, chat_history, new_message, context_text, api_key):
             raise ValueError("API Key ຂອງ OpenAI ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ມີສິດເຂົ້າເຖິງ.")
         raise ValueError(f"ເກີດຂໍ້ຜິດພາດຈາກ OpenAI API: {error_msg}")
 
-def _generate_anthropic(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_key):
+def _generate_anthropic(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_key, num_objective=None, num_subjective=None):
     import anthropic
     
     key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -214,7 +227,7 @@ def _generate_anthropic(model_name, context_text, num_questions, difficulty_lao,
         raise ValueError("ບໍ່ພົບ API Key ຂອງ Anthropic. ກະລຸນາຕັ້ງຄ່າ API Key ໃນສ່ວນການຕັ້ງຄ່າ.")
         
     client = anthropic.Anthropic(api_key=key)
-    prompt = _build_prompt(context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language)
+    prompt = _build_prompt(context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, num_objective, num_subjective)
     
     system_prompt = "You are a curriculum designer. You must output ONLY a valid JSON object matching the requested schema. No markdown wrappers, no introductory text."
     

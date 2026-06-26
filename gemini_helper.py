@@ -21,6 +21,10 @@ class TestSchema(BaseModel):
     title: str = Field(description="A suitable, professional title for the test in Lao language based on the topic.")
     questions: list[QuestionSchema]
 
+class DocumentMetadata(BaseModel):
+    subject: str = Field(description="The educational subject of the document, e.g. Mathematics, Physics, Chemistry, History, Geography, general biology, general science, general lesson, general knowledge. If not found, write 'ບົດຮຽນທົ່ວໄປ'. Output the subject name in Lao, e.g. 'ຄະນິດສາດ', 'ຟີຊິກສາດ', 'ເຄມີສາດ', 'ປະຫວັດສາດ', 'ພູມສາດ', 'ພາສາລາວ', 'ພາສາອັງກິດ', 'ຊີວະວິທະຍາ'. Only return the subject name itself.")
+    grade: str = Field(description="The grade level of the lesson. E.g. 'ມ.1', 'ມ.2', 'ມ.3', 'ມ.4', 'ມ.5', 'ມ.6', 'ມ.7', or similar Lao grade format (or empty string if not found or cannot determine).")
+
 def optimize_context_text(text, max_chars=60000):
     if not text or len(text) <= max_chars:
         return text or ""
@@ -55,7 +59,38 @@ def get_client(api_key=None):
         raise ValueError("ບໍ່ພົບ API Key ຂອງ Gemini. ກະລຸນາຕັ້ງຄ່າ API Key ໃນສ່ວນການຕັ້ງຄ່າ.")
     return genai.Client(api_key=key)
 
-def generate_test_questions(context_text, num_questions, difficulty_lao, question_type='multiple_choice', custom_instructions='', num_options=4, language='lao', api_key=None):
+def analyze_document_metadata(context_text, api_key=None):
+    try:
+        client = get_client(api_key)
+        # Use first 8000 characters of text to determine metadata to save tokens/speed
+        sample_text = (context_text or "")[:8000]
+        if not sample_text.strip():
+            return {"subject": "ບົດຮຽນທົ່ວໄປ", "grade": "ມ.7"}
+        
+        prompt = (
+            "Analyze the following document snippet. Determine the academic subject (e.g. Mathematics, Physics, Chemistry, Lao Language) "
+            "and the grade level (e.g. ມ.1 to ມ.7). Return the structured JSON output."
+        )
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[prompt, sample_text],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=DocumentMetadata,
+                temperature=0.1
+            )
+        )
+        data = json.loads(response.text)
+        return {
+            "subject": data.get("subject", "ບົດຮຽນທົ່ວໄປ") or "ບົດຮຽນທົ່ວໄປ",
+            "grade": data.get("grade", "ມ.7") or "ມ.7"
+        }
+    except Exception as e:
+        print(f"Error analyzing document metadata: {e}")
+        return {"subject": "ບົດຮຽນທົ່ວໄປ", "grade": "ມ.7"}
+
+def generate_test_questions(context_text, num_questions, difficulty_lao, question_type='multiple_choice', custom_instructions='', num_options=4, language='lao', api_key=None, model_name='gemini-2.5-flash', num_objective=None, num_subjective=None):
     """
     Generate test questions based on the lesson content, supporting multiple formats and custom instructions.
     """
@@ -100,7 +135,13 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
        * The correct expected model answer MUST be provided inside the 'explanation' field (e.g. 'ຄຳຕອບທີ່ຖືກຕ້ອງແມ່ນ: [expected answer]').
        * 'correct_option' should be set to 'A' (as a placeholder)."""
     elif question_type == 'mixed':
-        format_instructions = """5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
+        if num_objective is not None and num_subjective is not None:
+            format_instructions = f"""5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
+       * The first {num_objective} questions MUST be Multiple Choice (options option_a, option_b, option_c, option_d are provided, and correct_option is one of A, B, C, or D).
+       * The next {num_subjective} questions MUST be Short Answer/Essay questions (options 'option_a', 'option_b', 'option_c', and 'option_d' MUST ALL be empty strings "", and the correct expected answer guidelines/description MUST be provided in the 'explanation' field).
+       * 'correct_option' for Short Answer/Essay questions should be set to 'A' (as a placeholder)."""
+        else:
+            format_instructions = """5. Format: A mix of Multiple Choice (Objective) and Short Answer/Essay (Subjective) questions.
        * Roughly half of the questions should be Multiple Choice (options A, B, C, D are provided, and correct_option is one of A, B, C, or D).
        * The other half of the questions should be Short Answer/Essay questions (options 'option_a', 'option_b', 'option_c', and 'option_d' MUST ALL be empty strings "", and the correct expected answer guidelines/description MUST be provided in the 'explanation' field).
        * 'correct_option' for Short Answer/Essay questions should be set to 'A' (as a placeholder)."""
@@ -122,7 +163,8 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
     3. Test Size: Generate exactly {num_questions} questions.
     4. Difficulty Level: The difficulty of the questions must be {difficulty_desc}.
     {format_instructions}
-    6. Explanations: Provide a clear and helpful explanation for why the correct option is right.{custom_ins_clause}
+    6. Explanations: Provide a clear and helpful explanation for why the correct option is right.
+    7. LaTeX Formatting: For math, science, or technical topics, you MUST format all mathematical expressions, chemical formulas, equations, and technical variables using LaTeX. Use single dollar signs $...$ for inline equations (e.g. $y = mx + c$) and double dollar signs $$...$$ for block/centered equations. Ensure the LaTeX syntax is clean and standard.{custom_ins_clause}
     
     LESSON CONTEXT:
     \"\"\"{context_text}\"\"\"
@@ -130,7 +172,7 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
     
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=model_name,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -150,7 +192,6 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
     
     try:
         data = json.loads(response.text)
-        
         return data, token_count
     except Exception as e:
         # Fallback if parsing fails (highly unlikely with Structured Outputs)
@@ -158,7 +199,7 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
         print(response.text)
         raise ValueError("Gemini ຕອບສະໜອງໃນຮູບແບບທີ່ບໍ່ຖືກຕ້ອງ. ກະລຸນາລອງໃໝ່.")
 
-def generate_chat_response(chat_history, new_message, context_text, api_key=None):
+def generate_chat_response(chat_history, new_message, context_text, api_key=None, model_name='gemini-2.5-flash'):
     """
     Generate chat response in Lao using the lesson context.
     """
@@ -199,7 +240,7 @@ def generate_chat_response(chat_history, new_message, context_text, api_key=None
     
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=model_name,
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,

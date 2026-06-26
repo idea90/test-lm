@@ -165,6 +165,16 @@ def increment_token_usage(user_id, tokens):
     conn.commit()
     conn.close()
 
+def is_user_within_token_limit(user_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT total_tokens_used, token_limit FROM users WHERE id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row['total_tokens_used'] < row['token_limit']
+    return True
+
 # Source management
 def add_source(filename, file_size, text_content, user_id):
     conn = get_db_connection()

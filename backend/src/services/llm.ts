@@ -38,6 +38,17 @@ const DocumentMetadataSchema = {
   required: ["subject", "grade"]
 };
 
+function cleanJsonString(text: string): string {
+  let cleaned = text.trim();
+  if (cleaned.startsWith("```")) {
+    const match = cleaned.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+    if (match) {
+      cleaned = match[1].trim();
+    }
+  }
+  return cleaned;
+}
+
 function getGeminiClient(apiKey?: string) {
   const key = apiKey || process.env.GEMINI_API_KEY;
   if (!key) {
@@ -66,7 +77,7 @@ export async function analyzeDocumentMetadata(contextText: string, apiKey?: stri
       }
     });
 
-    const data = JSON.parse(response.text || '{}');
+    const data = JSON.parse(cleanJsonString(response.text || '{}'));
     return {
       subject: data.subject || "ບົດຮຽນທົ່ວໄປ",
       grade: data.grade || "ມ.7"
@@ -223,7 +234,7 @@ export async function generateTestQuestions(params: {
     });
 
     const text = response.text || '{}';
-    let data = JSON.parse(text);
+    let data = JSON.parse(cleanJsonString(text));
     data = enforceQuestionFormat(data, questionType, numObjective);
 
     const tokenCount = (response.usageMetadata?.promptTokenCount || 0) + (response.usageMetadata?.candidatesTokenCount || 0);
@@ -292,7 +303,7 @@ export async function generateTestQuestions(params: {
     });
 
     const textContent = response.content[0].type === 'text' ? response.content[0].text : '{}';
-    let data = JSON.parse(textContent);
+    let data = JSON.parse(cleanJsonString(textContent));
     data = enforceQuestionFormat(data, questionType, numObjective);
     const tokenCount = response.usage.input_tokens + response.usage.output_tokens;
     return { data, tokenCount };

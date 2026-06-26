@@ -1,0 +1,112 @@
+[
+  {
+    "id": 16,
+    "test_id": 2,
+    "question_text": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳກິລິຍາ (dkovjko8e]k;y-kdko) ມີຈັກປະເພດ?",
+    "option_a": "ມີ 2 ປະເພດຄື: ກິລິຍາສັງຫານ ແລະ ກິລິຍາບໍ່ສັງຫານ.",
+    "option_b": "ມີ 3 ປະເພດຄື: ກິລິຍາສັງຫານ, ກິລິຍາບໍ່ສັງຫານ ແລະ ກິລິຍາຊ່ວຍ.",
+    "option_c": "ມີ 4 ປະເພດຄື: ກິລິຍາສັງຫານ, ກິລິຍາບໍ່ສັງຫານ, ກິລິຍາເຊື່ອມ ແລະ ກິລິຍາຊ່ວຍ.",
+    "option_d": "ມີ 5 ປະເພດຄື: ກິລິຍາສັງຫານ, ກິລິຍາບໍ່ສັງຫານ, ກິລິຍາເຊື່ອມ, ກິລິຍາຊ່ວຍ ແລະ ກິລິຍາສະແດງ.",
+    "correct_option": "C",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳກິລິຍາ (dkovjko8e]k;y-kdko) ມີ 4 ປະເພດຄື: ກິລິຍາສັງຫານ (vjko c[[zjko), ກິລິຍາບໍ່ສັງຫານ (vjko grnjv9a[.97;k,le7ao0v’g]njv’), ກິລິຍາເຊື່ອມ (vjko]kp]tvPf8jk’M) ແລະ ກິລິຍາຊ່ວຍ (vjkomq[m;o7no)."
+  },
+  {
+    "id": 17,
+    "test_id": 2,
+    "question_text": "ຄຳນາມ/ຄຳແທນນາມ (czodko) ທີ່ອີງໃສ່ຮູບແບບຂອງມັນ, ຕາມທີ່ກ່າວໃນບົດຮຽນ, ມີຈັກປະເພດ?",
+    "option_a": "czodkoxt9exu, czodkoxt9egfnvo, czodkoxt9evkmyf.",
+    "option_b": "czodkoxt9e0Ao, czodkoxt9e3I’, czodkoxt9e7e.",
+    "option_c": "czodkoxt9e]af, czodkoxt9e]kp, czodkoxt9e76.",
+    "option_d": "czodkoxt9e8Qo, czodkoxt9eIj;, czodkoxt9e7yf.",
+    "correct_option": "A",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳນາມ/ຄຳແທນນາມ (czodko) ທີ່ອີງໃສ່ຮູບແບບຂອງມັນມີ 3 ປະເພດຄື: czodkoxt9exu, czodkoxt9egfnvo ແລະ czodkoxt9evkmyf."
+  },
+  {
+    "id": 18,
+    "test_id": 2,
+    "question_text": "ຄຳຖາມ (9qf\\kp) ທີ່ກ່າວໃນບົດຮຽນມີຈັກປະເພດ?",
+    "option_a": "2 ປະເພດ.",
+    "option_b": "3 ປະເພດ.",
+    "option_c": "4 ປະເພດ.",
+    "option_d": "5 ປະເພດ.",
+    "correct_option": "B",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳຖາມ (9qf\\kp) ມີ 3 ປະເພດຄື: 9qf\\kplj;o8q;, 9qf\\kprq;rao;Pd ແລະ 9qf\\kp]af4tdko s^n |a’lnmk’dko."
+  },
+  {
+    "id": 19,
+    "test_id": 2,
+    "question_text": "ຂໍ້ໃດລຸ່ມນີ້ບໍ່ແມ່ນປະເພດຂອງຄຳຊີ້ສະເພາະ ([qf[aombddv’xt-5,]) ທີ່ກ່າວໃນບົດຮຽນ?",
+    "option_a": "[aombd]tvPf.",
+    "option_b": "[aombdme,tfk.",
+    "option_c": "[aombdsp=h.",
+    "option_d": "[aombd7eok,.",
+    "correct_option": "D",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳຊີ້ສະເພາະ ([qf[aombddv’xt-5,]) ມີ 3 ປະເພດຄື: [aombd]tvPf, [aombdme,tfk ແລະ [aombdsp=h. ດັ່ງນັ້ນ, [aombd7eok, ບໍ່ແມ່ນປະເພດທີ່ກ່າວເຖິງ."
+  },
+  {
+    "id": 20,
+    "test_id": 2,
+    "question_text": "ໜ້າທີ່ຫຼັກຂອງຄຳເຊື່ອມ ([qflqomtok]) ຕາມທີ່ອະທິບາຍໃນບົດຮຽນແມ່ນຫຍັງ?",
+    "option_a": "ເພື່ອອະທິບາຍຄຸນນະພາບຂອງຄຳນາມ.",
+    "option_b": "ເພື່ອເຊື່ອມຕໍ່ສອງປະໂຫຍກ ຫຼື ຫຼາຍກວ່າ.",
+    "option_c": "ເພື່ອສະແດງຄວາມເປັນເຈົ້າຂອງ.",
+    "option_d": "ເພື່ອຖາມຄຳຖາມ.",
+    "correct_option": "B",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳເຊື່ອມ ([qflqomtok]) ແມ່ນຄຳທີ່ໃຊ້ເຊື່ອມຕໍ່ສອງປະໂຫຍກ ຫຼື ຫຼາຍກວ່າ."
+  },
+  {
+    "id": 21,
+    "test_id": 2,
+    "question_text": "ຕາມບົດຮຽນ, ສອງອົງປະກອບໂຄງສ້າງຫຼັກຂອງຄຳວິເສດ ([qfvtmy[kp]) ແມ່ນຫຍັງ?",
+    "option_a": "fhkoI6[dko ແລະ fhkogoNv.o.",
+    "option_b": "fhkoI6[dko ແລະ fhko7e.",
+    "option_c": "fhkoI6[dko ແລະ fhko8Qo.",
+    "option_d": "fhkoI6[dko ແລະ fhko3I’.",
+    "correct_option": "A",
+    "explanation": "ຕາມບົດຮຽນ, ໂຄງສ້າງຂອງຄຳວິເສດ ([qfvtmy[kp]) ປະກອບມີສອງພາກສ່ວນຫຼັກຄື: fhkoI6[dko (ພາກສ່ວນຄຳກິລິຍາ) ແລະ fhkogoNv.o (ພາກສ່ວນເນື້ອໃນ)."
+  },
+  {
+    "id": 22,
+    "test_id": 2,
+    "question_text": "ບົດບາດຫຼັກຂອງຄຳບຸພະບົດ ([qfryl6f]) ຕາມທີ່ກຳນົດໄວ້ໃນບົດຮຽນແມ່ນຫຍັງ?",
+    "option_a": "ເພື່ອອະທິບາຍການກະທຳ.",
+    "option_b": "ເພື່ອສະແດງຄວາມສຳພັນລະຫວ່າງຄຳ ຫຼື ວະລີ ແລະ ກຳນົດຕຳແໜ່ງຂອງຄຳນາມ.",
+    "option_c": "ເພື່ອຖາມຄຳຖາມ.",
+    "option_d": "ເພື່ອສະແດງອາລົມ.",
+    "correct_option": "B",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳບຸພະບົດ ([qfryl6f]) ແມ່ນຄຳທີ່ໃຊ້ສະແດງຕຳແໜ່ງຂອງສິ່ງຕ່າງໆ ແລະ ຊີ້ແຈງຄວາມສຳພັນຂອງສິ່ງທີ່ວາງຢູ່ໃນປະໂຫຍກ."
+  },
+  {
+    "id": 23,
+    "test_id": 2,
+    "question_text": "ຕາມບົດຮຽນ, ຄຳອຸທານ (;t]u) ມີຈັກປະເພດ?",
+    "option_a": "5 ປະເພດ.",
+    "option_b": "6 ປະເພດ.",
+    "option_c": "7 ປະເພດ.",
+    "option_d": "8 ປະເພດ.",
+    "correct_option": "C",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, ຄຳອຸທານ (;t]u) ມີ 7 ປະເພດຄື: ok,;t]u, cmook,;t]u, de,t;t]u, 75ook,;t]u, 7eg-njv,;t]u, 7e8+;t]u ແລະ v5mko;t]u."
+  },
+  {
+    "id": 24,
+    "test_id": 2,
+    "question_text": "ຂໍ້ໃດລຸ່ມນີ້ແມ່ນຕົວຢ່າງຂອງ '7eg-njv,' (ຄຳເຊື່ອມ) ທີ່ກ່າວໃນບົດຮຽນ?",
+    "option_a": "g-yj’ (ດັ່ງນັ້ນ/ສະນັ້ນ).",
+    "option_b": "3vK (ໂອ້ຍ!/ອະນິຈາ!).",
+    "option_c": "9qf\\kp (ຄຳຖາມ).",
+    "option_d": "[aombd (ຄຳຊີ້ສະເພາະ).",
+    "correct_option": "A",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, 'g-yj’' ແມ່ນຕົວຢ່າງຂອງ '7eg-njv,' (ຄຳເຊື່ອມ)."
+  },
+  {
+    "id": 25,
+    "test_id": 2,
+    "question_text": "ຂໍ້ໃດລຸ່ມນີ້ແມ່ນຕົວຢ່າງຂອງ '7e8+' (ຄຳວິເສດ) ທີ່ກ່າວໃນບົດຮຽນ?",
+    "option_a": "7eok, (ຄຳນາມ).",
+    "option_b": "da[ (ໄປ/ຢູ່).",
+    "option_c": "vjko (ຄຳກິລິຍາ).",
+    "option_d": "[kf (ສິ່ງຂອງ/ສິ່ງ).",
+    "correct_option": "B",
+    "explanation": "ຕາມເນື້ອໃນບົດຮຽນ, 'da[' ແມ່ນຕົວຢ່າງຂອງ '7e8+' (ຄຳວິເສດ)."
+  }
+]

@@ -113,6 +113,16 @@ function getUserId(req: express.Request): number | null {
   return req.session && req.session.user_id ? Number(req.session.user_id) : null;
 }
 
+function getProfilePicUrl(pic: string | null | undefined, username: string): string {
+  if (!pic) {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
+  }
+  if (pic.startsWith('http://') || pic.startsWith('https://') || pic.startsWith('/')) {
+    return pic;
+  }
+  return `/uploads/avatars/${pic}`;
+}
+
 // ─── AUTHENTICATION ROUTES ───────────────────────────────────────────────────
 
 app.post('/api/auth/register', async (req, res) => {
@@ -148,7 +158,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   const isGuest = user.username === 'guest';
   req.session = { user_id: user.id, username: user.username, is_guest: isGuest };
-  const profile_pic = user.profile_pic || `https://ui-avatars.com/api/?name=${user.username}&background=random`;
+  const profile_pic = getProfilePicUrl(user.profile_pic, user.username);
 
   return res.json({
     message: "ເຂົ້າລະບົບສຳເລັດ",
@@ -183,7 +193,7 @@ app.post('/api/auth/guest', async (req, res) => {
     }
 
     req.session = { user_id: userId, username: username, is_guest: true };
-    const profile_pic = (user && user.profile_pic) || `https://ui-avatars.com/api/?name=${username}&background=random`;
+    const profile_pic = getProfilePicUrl(user && user.profile_pic, username);
 
     return res.json({
       message: "ເຂົ້າລະບົບໃນຖານະ Guest ສຳເລັດ",
@@ -210,7 +220,7 @@ app.get('/api/auth/me', async (req, res) => {
       const user = await db.getUserById(userId);
       if (user) {
         const username = user.username;
-        const profile_pic = user.profile_pic || `https://ui-avatars.com/api/?name=${username}&background=random`;
+        const profile_pic = getProfilePicUrl(user.profile_pic, username);
         return res.json({
           logged_in: true,
           user_id: userId,
@@ -240,7 +250,7 @@ app.post('/api/user/profile-pic', upload.single('file'), async (req, res) => {
   await fs.promises.writeFile(destPath, req.file.buffer);
   await db.updateUserProfilePic(userId, filename);
 
-  return res.json({ message: "ອັບເດດຮູບໂປຣຟາຍສຳເລັດ", profile_pic: filename });
+  return res.json({ message: "ອັບເດດຮູບໂປຣຟາຍສຳເລັດ", profile_pic: `/uploads/avatars/${filename}` });
 });
 
 app.delete('/api/user/account', async (req, res) => {

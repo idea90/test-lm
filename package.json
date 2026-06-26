@@ -3,7 +3,7 @@
     "start": "concurrently \"npm --prefix next-app run dev\" \"npm --prefix backend start\"",
     "dev": "npm --prefix next-app run dev",
     "build": "npm --prefix backend run build && npm --prefix next-app run build",
-    "prod": "npm run build && npm --prefix backend start",
+    "prod": "npm run build && concurrently \"npm --prefix next-app start\" \"npm --prefix backend start\"",
     "lint": "npm --prefix next-app run lint"
   },
   "dependencies": {
