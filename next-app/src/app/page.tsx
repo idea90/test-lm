@@ -1,5 +1,5 @@
+"use client";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import './index.css';
 
 // ═══ Icons ═══
 const I = ({ name, size = 20, style, className }: { name: string; size?: number; style?: React.CSSProperties; className?: string }) => {
@@ -418,18 +418,29 @@ export default function App() {
   const [previewInstructions, setPreviewInstructions] = useState('ຈົ່ງເລືອກເອົາຂໍ້ທີ່ຖືກຕ້ອງທີ່ສຸດພຽງຂໍ້ດຽວຈາກຄຳຖາມລຸ່ມນີ້:');
   const [previewTotalScore, setPreviewTotalScore] = useState(10);
 
-  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark');
-  const [colorTheme, setColorTheme] = useState(() => localStorage.getItem('colorTheme') || 'purple');
-  
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-    localStorage.setItem('theme', dark ? 'dark' : 'light');
-  }, [dark]);
+  const [dark, setDark] = useState(true);
+  const [colorTheme, setColorTheme] = useState('purple');
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+    const savedTheme = localStorage.getItem('theme');
+    const savedColor = localStorage.getItem('colorTheme');
+    if (savedTheme) setDark(savedTheme === 'dark');
+    if (savedColor) setColorTheme(savedColor);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    localStorage.setItem('theme', dark ? 'dark' : 'light');
+  }, [dark, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
     document.documentElement.setAttribute('data-color', colorTheme);
     localStorage.setItem('colorTheme', colorTheme);
-  }, [colorTheme]);
+  }, [colorTheme, mounted]);
 
   const { ts, show } = useToast();
   const fileRef = useRef(null);
@@ -760,6 +771,10 @@ export default function App() {
   };
 
   const selSources = sources.filter(s => selSrcIds.includes(s.id));
+
+  if (!mounted) {
+    return <div style={{ background: '#141218', minHeight: '100vh' }}></div>;
+  }
 
   // ═══ AUTH ═══
   if (!user) return (

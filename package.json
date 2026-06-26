@@ -1,12 +1,15 @@
 {
   "scripts": {
-    "start": "npm --prefix frontend start",
-    "dev": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build",
-    "prod": "npm --prefix frontend run prod",
-    "lint": "npm --prefix frontend run lint"
+    "start": "concurrently \"npm --prefix next-app run dev\" \"npm --prefix backend start\"",
+    "dev": "npm --prefix next-app run dev",
+    "build": "npm --prefix backend run build && npm --prefix next-app run build",
+    "prod": "npm run build && npm --prefix backend start",
+    "lint": "npm --prefix next-app run lint"
   },
   "dependencies": {
-    "autoskill": "^0.1.0"
+    "@composio/core": "^0.12.0",
+    "autoskill": "^0.1.0",
+    "concurrently": "^10.0.3",
+    "dotenv": "^17.4.2"
   }
 }
