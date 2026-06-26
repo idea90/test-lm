@@ -211,6 +211,165 @@ function ModelSelect({ value, onChange }) {
   );
 }
 
+function CustomNumberInput({ className, style, ...props }: any) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const adjustVal = (amount: number) => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const currentVal = parseInt(input.value) || 0;
+    let newVal = currentVal + amount;
+
+    if (props.min !== undefined) newVal = Math.max(Number(props.min), newVal);
+    if (props.max !== undefined) newVal = Math.min(Number(props.max), newVal);
+
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+    if (setter) {
+      setter.call(input, newVal);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  };
+
+  const wrapperStyle: React.CSSProperties = {
+    position: 'relative',
+    display: 'inline-flex',
+    alignItems: 'center',
+  };
+  
+  if (style) {
+    if (style.width) wrapperStyle.width = style.width;
+    if (style.margin) wrapperStyle.margin = style.margin;
+    if (style.marginTop) wrapperStyle.marginTop = style.marginTop;
+    if (style.marginBottom) wrapperStyle.marginBottom = style.marginBottom;
+    if (style.marginLeft) wrapperStyle.marginLeft = style.marginLeft;
+    if (style.marginRight) wrapperStyle.marginRight = style.marginRight;
+    if (style.flex) wrapperStyle.flex = style.flex;
+  }
+
+  const inputStyle: React.CSSProperties = {
+    ...style,
+    width: '100%',
+    margin: 0,
+    marginTop: 0,
+    marginBottom: 0,
+    marginLeft: 0,
+    marginRight: 0,
+  };
+
+  return (
+    <div className="custom-number-wrapper" style={wrapperStyle}>
+      <input
+        ref={inputRef}
+        type="number"
+        className={className}
+        style={inputStyle}
+        {...props}
+      />
+      <div className="custom-number-arrows">
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => adjustVal(1)}
+          className="custom-number-arrow up"
+        >
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+            <path d="M7 14l5-5 5 5z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => adjustVal(-1)}
+          className="custom-number-arrow down"
+        >
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+            <path d="M7 10l5 5 5-5z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CustomSelect({ value, options, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedOption = options.find(o => o.value === value) || options[0] || { label: '', value: '' };
+
+  return (
+    <div className="custom-dropdown-container" ref={containerRef}>
+      <button 
+        type="button" 
+        className="custom-dropdown-trigger" 
+        onClick={() => setIsOpen(!isOpen)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+      >
+        <span className="custom-dropdown-value">
+          <span>{selectedOption.label}</span>
+        </span>
+        <svg 
+          width="12" 
+          height="12" 
+          viewBox="0 0 16 16" 
+          fill="currentColor"
+          style={{ 
+            transition: 'transform var(--motion-std)', 
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            color: 'var(--md-outline)' 
+          }}
+        >
+          <path d="M8 11L3 6h10z" />
+        </svg>
+      </button>
+      
+      {isOpen && (
+        <div className="custom-dropdown-menu" role="listbox">
+          {options.map(o => {
+            const isSel = o.value === value;
+            return (
+              <div 
+                key={o.value} 
+                className={`custom-dropdown-item ${isSel ? 'selected' : ''}`}
+                role="option"
+                aria-selected={isSel}
+                onClick={() => {
+                  onChange(o.value);
+                  setIsOpen(false);
+                }}
+              >
+                <div className="custom-dropdown-item-left">
+                  <div className="custom-dropdown-item-text">
+                    <span className="custom-dropdown-item-title">{o.label}</span>
+                  </div>
+                </div>
+                {isSel && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ═══ APP ═══
 export default function App() {
   const [user, setUser] = useState(null);
@@ -669,12 +828,12 @@ export default function App() {
             const isSelected = selSrcIds.includes(s.id);
             return (
               <div key={s.id} className={`sb-item ${isSelected ? 'active' : ''}`} onClick={() => toggleSourceSelect(s.id)}>
-                <input 
-                  type="checkbox" 
-                  checked={isSelected} 
-                  readOnly 
-                  style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--md-primary)', marginRight: 2 }}
-                />
+                <div style={{ position: 'relative', width: 16, height: 16, marginRight: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <input type="checkbox" className="md-custom-checkbox-input" checked={isSelected} readOnly />
+                  <div className="md-custom-checkbox-box" style={{ width: 16, height: 16, pointerEvents: 'none' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ width: 12, height: 12 }}><path d="M5 13l4 4L19 7"/></svg>
+                  </div>
+                </div>
                 <div className="sb-item-icon"><I name="file" size={14} /></div>
                 <div className="sb-item-info">
                   <div className="sb-item-name" title={s.filename}>{s.filename}</div>
@@ -912,7 +1071,7 @@ export default function App() {
                                 <div className="exam-instructions-official">
                                   <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', alignItems: 'center' }}>
                                     <input className="inline-input" defaultValue={previewSection} onBlur={e => setPreviewSection(e.target.value)} style={{ fontWeight: 'bold', width: '200px' }} />
-                                    <span>ຄະແນນພາກປາລະໄນ: <input className="inline-input" type="number" defaultValue={previewTotalScore} onBlur={e => setPreviewTotalScore(Number(e.target.value) || 0)} style={{ width: '50px', textAlign: 'center', fontWeight: 'bold' }} /> ຂໍ້</span>
+                                    <span>ຄະແນນພາກປາລະໄນ: <CustomNumberInput className="inline-input" defaultValue={previewTotalScore} onBlur={(e: any) => setPreviewTotalScore(Number(e.target.value) || 0)} style={{ width: '50px', textAlign: 'center', fontWeight: 'bold' }} /> ຂໍ້</span>
                                   </div>
                                   <div style={{ marginTop: '8px', display: 'flex', alignItems: 'flex-start', gap: 4 }}>
                                     <textarea className="inline-input" defaultValue={previewInstructions} onBlur={e => setPreviewInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
@@ -1099,144 +1258,111 @@ export default function App() {
         <div className="dialog-scrim" onClick={() => setConfigOpen(false)}>
           <div className="dialog-card" onClick={e => e.stopPropagation()}>
             <div className="dialog-header">ຕັ້ງຄ່າບົດສອບເສັງ</div>
-            <div className="dialog-body">
-              <div className="config-field">
-                <div className="config-field-label">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <I name="cpu" size={14} style={{ color: 'var(--md-outline)' }} />
-                    ໂມເດວ AI
-                  </span>
-                </div>
-                <ModelSelect value={cfg.model || 'gemini-2.5-flash'} onChange={val => setCfg(p => ({ ...p, model: val }))} />
-              </div>
-              <div className="config-field">
-                <div className="config-field-label">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <I name="terminal" size={14} style={{ color: 'var(--md-outline)' }} />
-                    ຄຳສັ່ງລະບົບ (System Prompt)
-                  </span>
-                </div>
-                <select className="md-select" value={cfg.systemPrompt || 'default'} onChange={e => setCfg(p => ({ ...p, systemPrompt: e.target.value }))}>
-                  {systemPrompts.map(sp => (
-                    <option key={sp} value={sp}>{sp === 'default' ? 'ມາດຕະຖານ' : sp}</option>
-                  ))}
-                </select>
-              </div>
-              {cfg.type === 'mixed' ? (
-                <>
-                  <div className="config-field">
-                    <div className="config-field-label">
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
-                        ຈຳນວນ ປາລະໄນ (ຂໍ້)
-                      </span>
-                    </div>
-                    <input 
-                      className="md-input" 
-                      type="number" 
-                      min="1" 
-                      max="100" 
-                      value={cfg.numObjective} 
-                      onChange={e => setCfg(p => ({ ...p, numObjective: Math.max(1, parseInt(e.target.value) || 1) }))} 
+            <div className="dialog-body" style={{ padding: '0 24px 20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              
+              {/* Section 1: AI Model */}
+              <div style={{ background: 'var(--md-surface-container-low)', padding: '16px', borderRadius: 'var(--shape-md)', border: '1px solid var(--md-outline-variant)' }}>
+                <h4 style={{ marginBottom: 16, color: 'var(--md-primary)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <I name="cpu" size={16} /> ລະບົບ AI (AI System)
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="config-field" style={{ marginBottom: 0 }}>
+                    <div className="config-field-label">ໂມເດວ AI (Model)</div>
+                    <ModelSelect value={cfg.model || 'gemini-2.5-flash'} onChange={val => setCfg(p => ({ ...p, model: val }))} />
+                  </div>
+                  <div className="config-field" style={{ marginBottom: 0 }}>
+                    <div className="config-field-label">ຄຳສັ່ງລະບົບ (System Prompt)</div>
+                    <CustomSelect 
+                      value={cfg.systemPrompt || 'default'} 
+                      onChange={val => setCfg(p => ({ ...p, systemPrompt: val }))}
+                      options={systemPrompts.map(sp => ({ value: sp, label: sp === 'default' ? 'ມາດຕະຖານ (Default)' : sp }))}
                     />
                   </div>
-                  <div className="config-field">
-                    <div className="config-field-label">
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
-                        ຈຳນວນ ອັດຕະໄນ (ຂໍ້)
-                      </span>
-                    </div>
-                    <input 
-                      className="md-input" 
-                      type="number" 
-                      min="1" 
-                      max="100" 
-                      value={cfg.numSubjective} 
-                      onChange={e => setCfg(p => ({ ...p, numSubjective: Math.max(1, parseInt(e.target.value) || 1) }))} 
-                    />
-                  </div>
-                </>
-              ) : (
-                <div className="config-field">
-                  <div className="config-field-label">
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
-                      ຈຳນວນ (ຂໍ້)
-                    </span>
-                  </div>
-                  <input 
-                    className="md-input" 
-                    type="number" 
-                    min="1" 
-                    max="100" 
-                    value={cfg.numQ} 
-                    onChange={e => setCfg(p => ({ ...p, numQ: Math.max(1, parseInt(e.target.value) || 1) }))} 
-                  />
-                </div>
-              )}
-              <div className="config-field">
-                <div className="config-field-label">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <I name="zap" size={14} style={{ color: 'var(--md-outline)' }} />
-                    ລະດັບ
-                  </span>
-                </div>
-                <div className="segmented-group">
-                  {[['easy','ງ່າຍ'],['medium','ປານກາງ'],['hard','ຍາກ']].map(([k, l]) => (
-                    <button key={k} className={`segmented-btn ${cfg.diff === k ? 'active' : ''}`} onClick={() => setCfg(p => ({ ...p, diff: k }))}>
-                      {cfg.diff === k && <I name="check" size={14} />} {l}
-                    </button>
-                  ))}
                 </div>
               </div>
-              <div className="config-field">
-                <div className="config-field-label">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <I name="globe" size={14} style={{ color: 'var(--md-outline)' }} />
-                    ພາສາ
-                  </span>
-                </div>
-                <select className="md-select" value={cfg.lang} onChange={e => setCfg(p => ({ ...p, lang: e.target.value }))}>
-                  <option value="lao">ພາສາລາວ</option>
-                  <option value="english">ພາສາອັງກິດ</option>
-                  <option value="mixed">ປະສົມ</option>
-                </select>
-              </div>
-              <div className="config-field">
-                <div className="config-field-label">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <I name="check-circle" size={14} style={{ color: 'var(--md-outline)' }} />
-                    ຮູບແບບ
-                  </span>
-                </div>
-                <select className="md-select" value={cfg.type} onChange={e => setCfg(p => ({ ...p, type: e.target.value }))}>
-                  <option value="multiple_choice">ປາລະໄນ (ເລືອກຕອບ)</option>
-                  <option value="true_false">ຖືກ / ຜິດ</option>
-                  <option value="short_answer">ອັດຕະໄນ (ຂຽນຕອບ)</option>
-                  <option value="mixed">ປະສົມ (ປາລະໄນ & ອັດຕະໄນ)</option>
-                </select>
-              </div>
-              <div className="config-field">
-                <div className="config-field-label">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <I name="edit" size={14} style={{ color: 'var(--md-outline)' }} />
-                    ຄຳສັ່ງເພີ່ມ
-                  </span>
-                </div>
-                <textarea className="md-textarea" rows={2} placeholder="ເນັ້ນບົດທີ 3..." value={cfg.custom} onChange={e => setCfg(p => ({ ...p, custom: e.target.value }))} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
-                <label className="md-custom-checkbox-row">
-                  <input type="checkbox" className="md-custom-checkbox-input" checked={cfg.shuffle} onChange={e => setCfg(p => ({ ...p, shuffle: e.target.checked }))} />
-                  <div className="md-custom-checkbox-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
-                  </div>
-                  <I name="shuffle" size={16} style={{ color: 'var(--md-outline)' }} />
-                  <span>ສັບປ່ຽນລຳດັບ</span>
-                </label>
 
+              {/* Section 2: Question Format */}
+              <div style={{ background: 'var(--md-surface-container-low)', padding: '16px', borderRadius: 'var(--shape-md)', border: '1px solid var(--md-outline-variant)' }}>
+                <h4 style={{ marginBottom: 16, color: 'var(--md-primary)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <I name="check-circle" size={16} /> ຮູບແບບຄຳຖາມ (Question Format)
+                </h4>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="config-field" style={{ marginBottom: 0 }}>
+                    <div className="config-field-label">ຮູບແບບ (Type)</div>
+                    <CustomSelect 
+                      value={cfg.type} 
+                      onChange={val => setCfg(p => ({ ...p, type: val }))}
+                      options={[
+                        { value: 'multiple_choice', label: 'ປາລະໄນ (ເລືອກຕອບ)' },
+                        { value: 'true_false', label: 'ຖືກ / ຜິດ' },
+                        { value: 'short_answer', label: 'ອັດຕະໄນ (ຂຽນຕອບ)' },
+                        { value: 'mixed', label: 'ປະສົມ (ປາລະໄນ & ອັດຕະໄນ)' }
+                      ]}
+                    />
+                  </div>
+                  <div className="config-field" style={{ marginBottom: 0 }}>
+                    <div className="config-field-label">ລະດັບຄວາມຍາກ (Difficulty)</div>
+                    <div className="segmented-group">
+                      {[['easy','ງ່າຍ'],['medium','ປານກາງ'],['hard','ຍາກ']].map(([k, l]) => (
+                        <button key={k} className={`segmented-btn ${cfg.diff === k ? 'active' : ''}`} onClick={() => setCfg(p => ({ ...p, diff: k }))} style={{ flex: 1, padding: '0 8px' }}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                  {cfg.type === 'mixed' ? (
+                    <>
+                      <div className="config-field" style={{ marginBottom: 0 }}>
+                        <div className="config-field-label">ຈຳນວນ ປາລະໄນ (ຂໍ້)</div>
+                        <CustomNumberInput className="md-input" min="1" max="100" value={cfg.numObjective} onChange={(e: any) => setCfg((p: any) => ({ ...p, numObjective: Math.max(1, parseInt(e.target.value) || 1) }))} />
+                      </div>
+                      <div className="config-field" style={{ marginBottom: 0 }}>
+                        <div className="config-field-label">ຈຳນວນ ອັດຕະໄນ (ຂໍ້)</div>
+                        <CustomNumberInput className="md-input" min="1" max="100" value={cfg.numSubjective} onChange={(e: any) => setCfg((p: any) => ({ ...p, numSubjective: Math.max(1, parseInt(e.target.value) || 1) }))} />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="config-field" style={{ marginBottom: 0 }}>
+                      <div className="config-field-label">ຈຳນວນ (ຂໍ້)</div>
+                      <CustomNumberInput className="md-input" min="1" max="100" value={cfg.numQ} onChange={(e: any) => setCfg((p: any) => ({ ...p, numQ: Math.max(1, parseInt(e.target.value) || 1) }))} />
+                    </div>
+                  )}
+                  <div className="config-field" style={{ marginBottom: 0 }}>
+                    <div className="config-field-label">ພາສາ (Language)</div>
+                    <CustomSelect 
+                      value={cfg.lang} 
+                      onChange={val => setCfg(p => ({ ...p, lang: val }))}
+                      options={[
+                        { value: 'lao', label: 'ພາສາລາວ' },
+                        { value: 'english', label: 'ພາສາອັງກິດ' },
+                        { value: 'mixed', label: 'ປະສົມ' }
+                      ]}
+                    />
+                  </div>
+                </div>
               </div>
+
+              {/* Section 3: Advanced */}
+              <div style={{ background: 'var(--md-surface-container-low)', padding: '16px', borderRadius: 'var(--shape-md)', border: '1px solid var(--md-outline-variant)' }}>
+                <h4 style={{ marginBottom: 16, color: 'var(--md-primary)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <I name="settings" size={16} /> ຕັ້ງຄ່າເພີ່ມເຕີມ (Advanced)
+                </h4>
+                <div className="config-field" style={{ marginBottom: '16px' }}>
+                  <div className="config-field-label">ຄຳສັ່ງເພີ່ມເຕີມໃຫ້ AI (Custom Instructions)</div>
+                  <textarea className="md-textarea" rows={2} placeholder="ເຊັ່ນ: ເນັ້ນບົດທີ 3 ເປັນຫຼັກ, ໃຊ້ຄຳສັບທີ່ເຂົ້າໃຈງ່າຍ..." value={cfg.custom} onChange={e => setCfg(p => ({ ...p, custom: e.target.value }))} style={{ fontSize: '13px' }} />
+                </div>
+                <label className="md-custom-checkbox-row" style={{ marginTop: 0 }}>
+                  <input type="checkbox" className="md-custom-checkbox-input" checked={cfg.shuffle} onChange={e => setCfg(p => ({ ...p, shuffle: e.target.checked }))} />
+                  <div className="md-custom-checkbox-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg></div>
+                  <I name="shuffle" size={16} style={{ color: 'var(--md-outline)' }} />
+                  <span>ສັບປ່ຽນລຳດັບຄຳຖາມອັດຕະໂນມັດ (Shuffle Options)</span>
+                </label>
+              </div>
+
             </div>
             <div className="dialog-actions">
               <button className="md-btn-text" onClick={() => setConfigOpen(false)}>ຍົກເລີກ</button>
@@ -1322,10 +1448,14 @@ export default function App() {
             <div className="dialog-body">
               <div className="md-field">
                 <label>ປະເພດຄຳຖາມ</label>
-                <select className="md-select" value={editModal.qType || 'obj'} onChange={e => setEditModal(p => ({ ...p, qType: e.target.value }))}>
-                  <option value="obj">ປາລະໄນ</option>
-                  <option value="subj">ອັດຕະໄນ</option>
-                </select>
+                <CustomSelect 
+                  value={editModal.qType || 'obj'} 
+                  onChange={val => setEditModal(p => ({ ...p, qType: val }))}
+                  options={[
+                    { value: 'obj', label: 'ປາລະໄນ' },
+                    { value: 'subj', label: 'ອັດຕະໄນ' }
+                  ]}
+                />
               </div>
               <div className="md-field"><label>ຄຳຖາມ</label><textarea className="md-textarea" rows={2} value={editModal.question_text} onChange={e => setEditModal(p => ({ ...p, question_text: e.target.value }))} /></div>
               
@@ -1398,13 +1528,12 @@ export default function App() {
               <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                 <div className="md-field" style={{ flex: 1, marginBottom: 0 }}>
                   <label>ເລີ່ມຕົ້ນ (ໜ້າ)</label>
-                  <input
+                  <CustomNumberInput
                     className="md-input"
-                    type="number"
                     min="1"
                     max={rangeDialogPages}
                     value={rangeDialogStart}
-                    onChange={e => {
+                    onChange={(e: any) => {
                       const val = Math.max(1, Math.min(rangeDialogPages, parseInt(e.target.value) || 1));
                       setRangeDialogStart(val);
                       if (val > rangeDialogEnd) setRangeDialogEnd(val);
@@ -1413,13 +1542,12 @@ export default function App() {
                 </div>
                 <div className="md-field" style={{ flex: 1, marginBottom: 0 }}>
                   <label>ສິ້ນສຸດ (ໜ້າ)</label>
-                  <input
+                  <CustomNumberInput
                     className="md-input"
-                    type="number"
                     min={rangeDialogStart}
                     max={rangeDialogPages}
                     value={rangeDialogEnd}
-                    onChange={e => {
+                    onChange={(e: any) => {
                       const val = Math.max(rangeDialogStart, Math.min(rangeDialogPages, parseInt(e.target.value) || rangeDialogPages));
                       setRangeDialogEnd(val);
                     }}
@@ -1438,16 +1566,18 @@ export default function App() {
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
-                <input
-                  type="checkbox"
-                  id="force-ocr-checkbox"
-                  checked={forceOcr}
-                  onChange={e => setForceOcr(e.target.checked)}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                />
-                <label htmlFor="force-ocr-checkbox" style={{ fontSize: '13px', cursor: 'pointer', color: 'var(--md-on-surface-variant)' }}>
-                  ບັງຄັບໃຊ້ OCR (ສຳລັບ PDF ທີ່ເປັນຮູບສະແກນ)
+              <div style={{ marginTop: '16px' }}>
+                <label className="md-custom-checkbox-row" style={{ margin: 0 }}>
+                  <input
+                    type="checkbox"
+                    className="md-custom-checkbox-input"
+                    checked={forceOcr}
+                    onChange={e => setForceOcr(e.target.checked)}
+                  />
+                  <div className="md-custom-checkbox-box">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+                  </div>
+                  <span style={{ fontSize: '13px', color: 'var(--md-on-surface-variant)' }}>ບັງຄັບໃຊ້ OCR (ສຳລັບ PDF ທີ່ເປັນຮູບສະແກນ)</span>
                 </label>
               </div>
             </div>
