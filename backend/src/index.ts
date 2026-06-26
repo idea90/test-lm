@@ -398,6 +398,42 @@ app.get('/api/system-prompts', (req, res) => {
   return res.json(list);
 });
 
+function getCleanErrorMessage(err: any): string {
+  if (!err) return "ເກີດຂໍ້ຜິດພາດທີ່ບໍ່ຮູ້ສາເຫດ";
+  
+  let msg = err.message || String(err);
+  
+  if (typeof msg === 'string' && (msg.startsWith('{') || msg.startsWith('['))) {
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.error && parsed.error.message) {
+        msg = parsed.error.message;
+      } else if (parsed.message) {
+        msg = parsed.message;
+      }
+    } catch {
+      // ignore
+    }
+  } else if (err.status && err.statusText) {
+    msg = `${err.status} ${err.statusText}`;
+  }
+  
+  if (msg.includes("experiencing high demand") || msg.includes("UNAVAILABLE") || msg.includes("503")) {
+    return "ລະບົບ AI ກໍາລັງມີຜູ້ໃຊ້ງານຈໍານວນຫຼາຍໃນຂະນະນີ້. ກະລຸນາລອງໃໝ່ອີກຄັ້ງໃນພາຍຫຼັງ (AI Service Temporarily Unavailable)";
+  }
+  if (msg.includes("API key") || msg.includes("API Key") || msg.includes("API_KEY_INVALID") || msg.includes("invalid key") || msg.includes("API key not found") || msg.includes("API_KEY")) {
+    return "API Key ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ພົບ API Key. ກະລຸນາກວດສອບການຕັ້ງຄ່າ API Key ຂອງທ່ານ.";
+  }
+  if (msg.includes("quota") || msg.includes("limit") || msg.includes("exhausted") || msg.includes("RESOURCE_EXHAUSTED")) {
+    return "ໂຄຕ້າການໃຊ້ງານ AI ຂອງທ່ານໝົດແລ້ວ ຫຼື ກາຍຂີດຈຳກັດ. ກະລຸນາກວດສອບ ຫຼື ປ່ຽນ API Key ໃໝ່.";
+  }
+  if (msg.includes("safety") || msg.includes("blocked") || msg.includes("SAFETY")) {
+    return "ເນື້ອຫາຖືກບລັອກໂດຍລະບົບຄວາມປອດໄພຂອງ AI. ກະລຸນາລອງກັບເອກະສານອື່ນ.";
+  }
+
+  return msg;
+}
+
 app.post('/api/tests/generate', async (req, res) => {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -522,7 +558,8 @@ app.post('/api/tests/generate', async (req, res) => {
     });
   } catch (err: any) {
     console.error("Generate error:", err);
-    return res.status(500).json({ error: `ເກີດຂໍ້ຜິດພາດໃນການສ້າງຂໍ້ສອບ: ${err.message}` });
+    const cleanMsg = getCleanErrorMessage(err);
+    return res.status(500).json({ error: `ເກີດຂໍ້ຜິດພາດໃນການສ້າງຂໍ້ສອບ: ${cleanMsg}` });
   }
 });
 
