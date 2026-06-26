@@ -91,7 +91,7 @@ function verifyWerkzeugHash(password: string, passwordHash: string): boolean {
         password,
         salt,
         expectedHashHex.length / 2,
-        { N, r, p }
+        { N, r, p, maxmem: 128 * 1024 * 1024 }
       );
       return calculatedHash.toString('hex') === expectedHashHex;
     }
