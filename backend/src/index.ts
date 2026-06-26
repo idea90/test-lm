@@ -129,8 +129,8 @@ app.post('/api/auth/register', async (req, res) => {
   const passHash = hashPassword(password);
   const userId = await db.createUser(username, passHash);
   if (userId) {
-    req.session = { user_id: userId };
-    return res.json({ message: "ລົງທະບຽນສຳເລັດ", user_id: userId });
+    req.session = { user_id: userId, username: username, is_guest: false };
+    return res.json({ message: "ລົງທະບຽນສຳເລັດ", user_id: userId, username: username, is_guest: false });
   }
   return res.status(500).json({ error: "ບໍ່ສາມາດລົງທະບຽນໄດ້" });
 });
@@ -146,43 +146,56 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(401).json({ error: "ຊື່ຜູ້ໃຊ້ ຫຼື ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ" });
   }
 
-  req.session = { user_id: user.id };
+  const isGuest = user.username === 'guest';
+  req.session = { user_id: user.id, username: user.username, is_guest: isGuest };
+  const profile_pic = user.profile_pic || `https://ui-avatars.com/api/?name=${user.username}&background=random`;
+
   return res.json({
-    message: "ເຂົ້າສູ່ລະບົບສຳເລັດ",
-    user: {
-      id: user.id,
-      username: user.username,
-      profile_pic: user.profile_pic
-    }
+    message: "ເຂົ້າລະບົບສຳເລັດ",
+    user_id: user.id,
+    username: user.username,
+    is_guest: isGuest,
+    profile_pic: profile_pic
   });
 });
 
 app.post('/api/auth/guest', async (req, res) => {
-  let userId = getUserId(req);
-  if (userId) {
-    const user = await db.getUserById(userId);
-    if (user) {
-      return res.json({
-        message: "ເຂົ້າສູ່ລະບົບແຂກສຳເລັດ",
-        user: { id: user.id, username: user.username, profile_pic: user.profile_pic }
-      });
+  try {
+    const username = 'guest';
+    let user = await db.getUserByUsername(username);
+    let userId: number;
+    
+    if (!user) {
+      const dummyHash = hashPassword('guest_bypass_hash_code_123');
+      const newId = await db.createUser(username, dummyHash, 50000);
+      if (!newId) {
+        user = await db.getUserByUsername(username);
+        if (user) {
+          userId = user.id;
+        } else {
+          return res.status(500).json({ error: "ບໍ່ສາມາດສ້າງບັນຊີ Guest ໄດ້" });
+        }
+      } else {
+        userId = newId;
+      }
+    } else {
+      userId = user.id;
     }
-  }
 
-  // Create auto guest
-  const randNum = Math.floor(1000 + Math.random() * 9000);
-  const guestUsername = `guest_${randNum}`;
-  const passHash = hashPassword(guestUsername);
-  // Guest gets 200,000 token limit
-  userId = await db.createUser(guestUsername, passHash, 200000);
-  if (userId) {
-    req.session = { user_id: userId };
+    req.session = { user_id: userId, username: username, is_guest: true };
+    const profile_pic = (user && user.profile_pic) || `https://ui-avatars.com/api/?name=${username}&background=random`;
+
     return res.json({
-      message: "ເຂົ້າສູ່ລະບົບແຂກສຳເລັດ",
-      user: { id: userId, username: guestUsername, profile_pic: null }
+      message: "ເຂົ້າລະບົບໃນຖານະ Guest ສຳເລັດ",
+      user_id: userId,
+      username: username,
+      is_guest: true,
+      profile_pic: profile_pic
     });
+  } catch (err: any) {
+    console.error("Guest login error:", err);
+    return res.status(500).json({ error: "ເກີດຂໍ້ຜິດພາດໃນລະບົບ" });
   }
-  return res.status(500).json({ error: "ບໍ່ສາມາດສ້າງຜູ້ໃຊ້ແຂກໄດ້" });
 });
 
 app.post('/api/auth/logout', (req, res) => {
@@ -191,19 +204,28 @@ app.post('/api/auth/logout', (req, res) => {
 });
 
 app.get('/api/auth/me', async (req, res) => {
-  const userId = getUserId(req);
-  if (!userId) {
-    return res.status(401).json({ error: "ບໍ່ໄດ້ເຂົ້າສູ່ລະບົບ" });
+  try {
+    const userId = getUserId(req);
+    if (userId) {
+      const user = await db.getUserById(userId);
+      if (user) {
+        const username = user.username;
+        const profile_pic = user.profile_pic || `https://ui-avatars.com/api/?name=${username}&background=random`;
+        return res.json({
+          logged_in: true,
+          user_id: userId,
+          username: username,
+          is_guest: req.session ? !!req.session.is_guest : false,
+          profile_pic: profile_pic
+        });
+      } else {
+        req.session = null;
+      }
+    }
+    return res.json({ logged_in: false });
+  } catch (err) {
+    return res.json({ logged_in: false });
   }
-  const user = await db.getUserById(userId);
-  if (!user) {
-    return res.status(401).json({ error: "ບໍ່ພົບຜູ້ໃຊ້ນີ້" });
-  }
-  return res.json({
-    id: user.id,
-    username: user.username,
-    profile_pic: user.profile_pic
-  });
 });
 
 app.post('/api/user/profile-pic', upload.single('file'), async (req, res) => {
