@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start": "concurrently \"vite\" \"cd .. && venv\\Scripts\\python app.py\"",
+    "start": "concurrently \"vite\" \"npm --prefix ../backend start\"",
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "prod": "tsc -b && vite build && cd .. && venv\\Scripts\\python app.py",
+    "prod": "tsc -b && vite build && npm --prefix ../backend start",
     "lint": "oxlint",
     "preview": "vite preview"
   },
