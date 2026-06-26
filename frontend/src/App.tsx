@@ -225,7 +225,8 @@ export default function App() {
 
   const [cfg, setCfg] = useState({
     numQ: 10, diff: 'medium', type: 'multiple_choice',
-    lang: 'lao', custom: '', shuffle: false, model: 'gemini-2.5-flash', systemPrompt: 'default'
+    lang: 'lao', custom: '', shuffle: false, model: 'gemini-2.5-flash', systemPrompt: 'default',
+    numObjective: 5, numSubjective: 5
   });
   const [dottedLines, setDottedLines] = useState(3);
   const [previewSubjInstructions, setPreviewSubjInstructions] = useState('ຈົ່ງຕອບຄຳຖາມລຸ່ມນີ້ໃສ່ບ່ອນວ່າງ:');
@@ -253,7 +254,7 @@ export default function App() {
   const [previewTitle, setPreviewTitle] = useState('');
   const [previewTime, setPreviewTime] = useState('90');
   const [previewGrade, setPreviewGrade] = useState('ມ.7');
-  const [showWatermark, setShowWatermark] = useState(true);
+  const [excludePages, setExcludePages] = useState('');
   const [previewSection, setPreviewSection] = useState('I. ພາກປາລະໄນ');
   const [previewInstructions, setPreviewInstructions] = useState('ຈົ່ງເລືອກເອົາຂໍ້ທີ່ຖືກຕ້ອງທີ່ສຸດພຽງຂໍ້ດຽວຈາກຄຳຖາມລຸ່ມນີ້:');
   const [previewTotalScore, setPreviewTotalScore] = useState(10);
@@ -370,6 +371,7 @@ export default function App() {
 
   const handleUpload = async (file) => {
     if (!file) return;
+    setExcludePages('');
     const nameLower = file.name.toLowerCase();
     const isPdf = nameLower.endsWith('.pdf');
     const isDocx = nameLower.endsWith('.docx');
@@ -413,6 +415,10 @@ export default function App() {
     if (pageStart !== null) fd.append('page_start', pageStart);
     if (pageEnd !== null) fd.append('page_end', pageEnd);
     if (forceOcr) fd.append('force_ocr', 'true');
+    if (excludePages) fd.append('exclude_pages', excludePages);
+    
+    const key = localStorage.getItem('gemini_api_key') || '';
+    if (key) fd.append('api_key', key);
 
     try {
       const r = await api.postForm('/api/sources/upload', fd);
@@ -422,6 +428,12 @@ export default function App() {
         await loadSources();
         setSelSrcIds([d.id]);
         loadStats();
+        if (d.subject) {
+          setPreviewSubject(d.subject);
+        }
+        if (d.grade) {
+          setPreviewGrade(d.grade);
+        }
       } else {
         showAlert(d.error);
       }
@@ -453,12 +465,14 @@ export default function App() {
       const r = await api.post('/api/tests/generate', {
         source_id: selSrcIds[0],
         source_ids: selSrcIds,
-        num_questions: cfg.numQ, difficulty: cfg.diff,
+        num_questions: cfg.type === 'mixed' ? (Number(cfg.numObjective) + Number(cfg.numSubjective)) : cfg.numQ, difficulty: cfg.diff,
         question_type: cfg.type, custom_instructions: cfg.custom,
         language: cfg.lang, shuffle_options: cfg.shuffle, 
         model: cfg.model || 'gemini-2.5-flash',
         system_prompt: cfg.systemPrompt || 'default',
-        api_keys: { gemini: key, openai: openai_key, anthropic: anthropic_key }
+        api_keys: { gemini: key, openai: openai_key, anthropic: anthropic_key },
+        num_objective: cfg.type === 'mixed' ? cfg.numObjective : undefined,
+        num_subjective: cfg.type === 'mixed' ? cfg.numSubjective : undefined
       });
       const d = await r.json();
       if (r.ok) { setActiveTest(d); loadStats(); show('ສ້າງບົດສອບເສັງສຳເລັດ!'); }
@@ -760,7 +774,17 @@ export default function App() {
                     )}
 
                     {!activeTest.rich_text_content && (
-                      <button className="toolbar-chip" onClick={() => { show('ດາວໂຫລດ Word...'); window.location.href = `/api/tests/${activeTest.id}/export/docx`; }}>
+                      <button className="toolbar-chip" onClick={() => {
+                        show('ດາວໂຫລດ Word...');
+                        const params = new URLSearchParams();
+                        if (previewSchool) params.append('school', previewSchool);
+                        if (previewSubject) params.append('subject', previewSubject);
+                        if (previewMotto) params.append('motto', previewMotto);
+                        if (previewGrade) params.append('grade', previewGrade);
+                        if (previewExamNo) params.append('exam_no', previewExamNo);
+                        if (previewTime) params.append('time_limit', previewTime);
+                        window.location.href = `/api/tests/${activeTest.id}/export/docx?${params.toString()}`;
+                      }}>
                         <I name="download" size={14} /> ສົ່ງອອກ Word
                       </button>
                     )}
@@ -823,11 +847,7 @@ export default function App() {
                           style={{ width: '80px', fontWeight: 500, borderBottomColor: 'rgba(0,0,0,0.15)' }} 
                         />
                       </div>
-                      {showWatermark && (
-                        <div className="paper-watermark" style={{ fontSize: '11px', fontStyle: 'italic', letterSpacing: '0.5px' }}>
-                          ສ້າງໂດຍ Test LM
-                        </div>
-                      )}
+
                     </div>
                     <div className="exam-paper-header-official">
 
@@ -884,7 +904,6 @@ export default function App() {
                     {(() => {
                         const objQs = activeTest.questions.filter(q => q.option_a || q.option_b || q.option_c || q.option_d);
                         const subjQs = activeTest.questions.filter(q => !q.option_a && !q.option_b && !q.option_c && !q.option_d);
-                        let globalQIndex = 0;
                         return (
                           <>
                             {/* Objective Section */}
@@ -900,8 +919,7 @@ export default function App() {
                                     <span style={{ whiteSpace: 'nowrap' }}>(ຂໍ້ລະ {(previewTotalScore / objQs.length).toFixed(2)})</span>
                                   </div>
                                 </div>
-                                {objQs.map((q) => {
-                                  const i = globalQIndex++;
+                                {objQs.map((q, i) => {
                                   return (
                                     <div key={q.id} className="exam-question">
                                       <div className="exam-q-row">
@@ -953,8 +971,7 @@ export default function App() {
                                     <textarea className="inline-input" defaultValue={previewSubjInstructions} onBlur={e => setPreviewSubjInstructions(e.target.value)} rows={2} style={{ flex: 1, resize: 'none', fontSize: '14px' }} />
                                   </div>
                                 </div>
-                                {subjQs.map((q) => {
-                                  const i = globalQIndex++;
+                                {subjQs.map((q, i) => {
                                   return (
                                     <div key={q.id} className="exam-question">
                                       <div className="exam-q-row">
@@ -1105,16 +1122,59 @@ export default function App() {
                   ))}
                 </select>
               </div>
-              <div className="config-field">
-                <div className="config-field-label">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
-                    ຈຳນວນ
-                  </span>
-                  <span className="config-field-badge">{cfg.numQ} ຂໍ້</span>
+              {cfg.type === 'mixed' ? (
+                <>
+                  <div className="config-field">
+                    <div className="config-field-label">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
+                        ຈຳນວນ ປາລະໄນ (ຂໍ້)
+                      </span>
+                    </div>
+                    <input 
+                      className="md-input" 
+                      type="number" 
+                      min="1" 
+                      max="100" 
+                      value={cfg.numObjective} 
+                      onChange={e => setCfg(p => ({ ...p, numObjective: Math.max(1, parseInt(e.target.value) || 1) }))} 
+                    />
+                  </div>
+                  <div className="config-field">
+                    <div className="config-field-label">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
+                        ຈຳນວນ ອັດຕະໄນ (ຂໍ້)
+                      </span>
+                    </div>
+                    <input 
+                      className="md-input" 
+                      type="number" 
+                      min="1" 
+                      max="100" 
+                      value={cfg.numSubjective} 
+                      onChange={e => setCfg(p => ({ ...p, numSubjective: Math.max(1, parseInt(e.target.value) || 1) }))} 
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="config-field">
+                  <div className="config-field-label">
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <I name="list" size={14} style={{ color: 'var(--md-outline)' }} />
+                      ຈຳນວນ (ຂໍ້)
+                    </span>
+                  </div>
+                  <input 
+                    className="md-input" 
+                    type="number" 
+                    min="1" 
+                    max="100" 
+                    value={cfg.numQ} 
+                    onChange={e => setCfg(p => ({ ...p, numQ: Math.max(1, parseInt(e.target.value) || 1) }))} 
+                  />
                 </div>
-                <input type="range" min="5" max="30" step="5" value={cfg.numQ} onChange={e => setCfg(p => ({ ...p, numQ: +e.target.value }))} />
-              </div>
+              )}
               <div className="config-field">
                 <div className="config-field-label">
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
@@ -1175,14 +1235,7 @@ export default function App() {
                   <I name="shuffle" size={16} style={{ color: 'var(--md-outline)' }} />
                   <span>ສັບປ່ຽນລຳດັບ</span>
                 </label>
-                <label className="md-custom-checkbox-row">
-                  <input type="checkbox" className="md-custom-checkbox-input" checked={showWatermark} onChange={e => setShowWatermark(e.target.checked)} />
-                  <div className="md-custom-checkbox-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>
-                  </div>
-                  <I name="eye" size={16} style={{ color: 'var(--md-outline)' }} />
-                  <span>ສະແດງລາຍນ້ຳ (Watermark)</span>
-                </label>
+
               </div>
             </div>
             <div className="dialog-actions">
@@ -1374,6 +1427,17 @@ export default function App() {
                 </div>
               </div>
               
+              <div className="md-field" style={{ marginTop: '16px', marginBottom: 0 }}>
+                <label>ຍົກເວັ້ນບາງໜ້າ (ເຊັ່ນ: 2, 4)</label>
+                <input
+                  className="md-input"
+                  type="text"
+                  placeholder="ລະບຸເລກໜ້າ ໂດຍແຍກດ້ວຍຈຸດ ( , )"
+                  value={excludePages}
+                  onChange={e => setExcludePages(e.target.value)}
+                />
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
                 <input
                   type="checkbox"

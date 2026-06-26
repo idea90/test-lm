@@ -37,8 +37,13 @@ def get_current_user(request: Request):
         return None
     return user_id
 
-def extract_text_from_pdf(file_stream, page_start=1, page_end=None, force_ocr=False):
+def extract_text_from_pdf(file_stream, page_start=1, page_end=None, force_ocr=False, exclude_pages=None):
     try:
+        from concurrent.futures import ThreadPoolExecutor
+        
+        if exclude_pages is None:
+            exclude_pages = set()
+            
         reader = pypdf.PdfReader(file_stream)
         total_pages = len(reader.pages)
         
@@ -48,29 +53,55 @@ def extract_text_from_pdf(file_stream, page_start=1, page_end=None, force_ocr=Fa
         file_stream.seek(0)
         pdf_bytes = file_stream.read()
         
-        text = ""
-        for i in range(start_idx, end_idx):
+        results = [None] * (end_idx - start_idx)
+        pages_to_ocr = []
+        
+        for idx, i in enumerate(range(start_idx, end_idx)):
+            page_num = i + 1
+            if page_num in exclude_pages:
+                results[idx] = ""
+                continue
+                
             page_text = ""
             if not force_ocr:
                 page = reader.pages[i]
                 page_text = page.extract_text() or ""
             
-            if force_ocr or not page_text or len(page_text.strip()) < 15:
-                page_num = i + 1
-                print(f"Running Tesseract OCR on page {page_num}...")
+            if not force_ocr and page_text and len(page_text.strip()) >= 15:
+                results[idx] = page_text
+            else:
+                pages_to_ocr.append((idx, page_num))
+                
+        if pages_to_ocr:
+            print(f"Running parallel Tesseract OCR on pages: {[p[1] for p in pages_to_ocr]}...")
+            
+            def ocr_page(page_num):
                 try:
                     images = convert_from_bytes(pdf_bytes, first_page=page_num, last_page=page_num, poppler_path=POPPLER_PATH)
                     if images:
                         ocr_text = pytesseract.image_to_string(images[0], lang='lao+eng')
                         if ocr_text and len(ocr_text.strip()) > 5:
-                            page_text = ocr_text
-                            print(f"Successfully OCR'd page {page_num} using Tesseract.")
+                            return page_num, ocr_text.strip()
                 except Exception as ocr_err:
                     print(f"OCR failed for page {page_num}: {ocr_err}")
+                return page_num, ""
             
-            if page_text:
-                text += page_text + "\n"
-                
+            max_workers = min(len(pages_to_ocr), 4, os.cpu_count() or 4)
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(ocr_page, page_num): idx
+                    for idx, page_num in pages_to_ocr
+                }
+                for future in futures:
+                    idx = futures[future]
+                    page_num, ocr_result = future.result()
+                    if ocr_result:
+                        results[idx] = ocr_result
+                        print(f"Successfully OCR'd page {page_num} using parallel Tesseract.")
+                    else:
+                        results[idx] = ""
+                        
+        text = "\n".join([r for r in results if r])
         return text.strip()
     except Exception as e:
         print(f"Error reading PDF: {e}")
@@ -115,7 +146,7 @@ def extract_text_from_image(file_stream):
         print(f"Error reading Image: {e}")
         return None
 
-def generate_docx_file(test_data):
+def generate_docx_file(test_data, school=None, subject=None, motto=None, grade=None, watermark=None, exam_no=None, time_limit=None):
     from docx import Document
     from docx.shared import Pt, Inches
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -132,36 +163,124 @@ def generate_docx_file(test_data):
     font.name = 'Noto Sans Lao'
     font.size = Pt(12)
     
+    def set_font(run, size=12, bold=False, italic=False):
+        run.font.name = 'Noto Sans Lao'
+        run.font.size = Pt(size)
+        run.bold = bold
+        run.italic = italic
+
+    # 1. Top Meta Row: Grade & Watermark
+    meta_table = doc.add_table(rows=1, cols=2)
+    meta_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    meta_table.autofit = False
+    
+    cell_left = meta_table.rows[0].cells[0]
+    cell_right = meta_table.rows[0].cells[1]
+    cell_left.width = Inches(3.2)
+    cell_right.width = Inches(3.2)
+    
+    p_left = cell_left.paragraphs[0]
+    p_left.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    run_left = p_left.add_run(f"ຊັ້ນ: {grade or 'ມ.7'}")
+    set_font(run_left, 11, bold=True)
+    
+
+    doc.add_paragraph()
+    
+    # 2. Lao Motto
+    if not motto:
+        motto = (
+            "ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ\n"
+            "ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນາຖາວອນ\n"
+            "------000-------"
+        )
+    for line in motto.split('\n'):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_after = Pt(2)
+        r = p.add_run(line.strip())
+        set_font(r, 11, bold=True)
+        
+    doc.add_paragraph()
+    
+    # 3. School & Exam No Row
+    school_table = doc.add_table(rows=1, cols=2)
+    school_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    s_left = school_table.rows[0].cells[0]
+    s_right = school_table.rows[0].cells[1]
+    s_left.width = Inches(4.5)
+    s_right.width = Inches(2.0)
+    
+    p_school = s_left.paragraphs[0]
+    p_school.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    r_school = p_school.add_run(f"ໂຮງຮຽນ: {school or '........................'}")
+    set_font(r_school, 11)
+    
+    p_exam = s_right.paragraphs[0]
+    p_exam.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    r_exam = p_exam.add_run(f"ເລກທີ: {exam_no or '........'}")
+    set_font(r_exam, 11)
+    
+    # 4. Title
     title_p = doc.add_paragraph()
     title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    title_run = title_p.add_run(test_data['title'])
-    title_run.bold = True
-    title_run.font.size = Pt(16)
+    title_p.paragraph_format.space_before = Pt(12)
+    title_p.paragraph_format.space_after = Pt(6)
+    title_run = title_p.add_run(f"ຫົວບົດສອບເສັງ: {test_data['title']}")
+    set_font(title_run, 15, bold=True)
     
-    diff_map = {'easy': 'ງ່າຍ', 'medium': 'ປານກາງ', 'hard': 'ຍາກ'}
-    diff_lao = diff_map.get(test_data['difficulty'].lower(), test_data['difficulty'])
+    # 5. Subject & Time Row
+    sub_table = doc.add_table(rows=1, cols=2)
+    sub_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-    info_p = doc.add_paragraph()
-    info_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    info_run = info_p.add_run(f"ລະດັບຄວາມຍາກ: {diff_lao}  |  ຈຳນວນ: {test_data['num_questions']} ຂໍ້\n")
-    info_run.font.size = Pt(11)
-    info_run.italic = True
+    sub_left = sub_table.rows[0].cells[0]
+    sub_right = sub_table.rows[0].cells[1]
+    sub_left.width = Inches(4.5)
+    sub_right.width = Inches(2.0)
     
-    table = doc.add_table(rows=1, cols=3)
-    table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_sub = sub_left.paragraphs[0]
+    p_sub.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    sub_str = subject or 'ບົດຮຽນທົ່ວໄປ'
+    if not sub_str.startswith('ວິຊາ'):
+        sub_str = f"ວິຊາ: {sub_str}"
+    r_sub = p_sub.add_run(sub_str)
+    set_font(r_sub, 11, bold=True)
     
-    hdr_cells = table.rows[0].cells
-    hdr_cells[0].text = "ຊື່ ແລະ ນາມສະກຸນ: ....................................."
-    hdr_cells[1].text = "ຫ້ອງຮຽນ: ................."
-    hdr_cells[2].text = "ວັນທີ: ....../....../......"
+    p_time = sub_right.paragraphs[0]
+    p_time.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    r_time = p_time.add_run(f"ເວລາ: {time_limit or '90'} ນາທີ")
+    set_font(r_time, 11)
     
-    for row in table.rows:
-        for cell in row.cells:
-            for paragraph in cell.paragraphs:
-                for run in paragraph.runs:
-                    run.font.name = 'Noto Sans Lao'
-                    run.font.size = Pt(11)
-                    
+    doc.add_paragraph()
+    
+    # 6. Student Grid Table
+    grid_table = doc.add_table(rows=1, cols=4)
+    grid_table.style = 'Table Grid'
+    grid_table.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    g_cells = grid_table.rows[0].cells
+    g_cells[0].width = Inches(3.8)
+    g_cells[1].width = Inches(0.9)
+    g_cells[2].width = Inches(0.9)
+    g_cells[3].width = Inches(0.9)
+    
+    p_det = g_cells[0].paragraphs[0]
+    p_det.paragraph_format.line_spacing = 1.3
+    set_font(p_det.add_run("ຊື່ ແລະ ນາມສະກຸນ: ....................................................\nຫ້ອງ: ....................................................\nວັນທີ: ....................................................\nເລກໂຕະ: ...................................................."), 10)
+    
+    p_sc = g_cells[1].paragraphs[0]
+    p_sc.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    set_font(p_sc.add_run("ຄະແນນ"), 10, bold=True)
+    
+    p_cmt = g_cells[2].paragraphs[0]
+    p_cmt.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    set_font(p_cmt.add_run("ຄຳເຫັນຂອງຄູ"), 10, bold=True)
+    
+    p_sgn = g_cells[3].paragraphs[0]
+    p_sgn.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    set_font(p_sgn.add_run("ລາຍເຊັນຄູ"), 10, bold=True)
+    
     doc.add_paragraph()
     lao_options = {'A': 'ກ', 'B': 'ຂ', 'C': 'ຄ', 'D': 'ງ'}
     
@@ -198,8 +317,7 @@ def generate_docx_file(test_data):
         
         for idx, q in enumerate(subjective_qs, 1):
             qp = doc.add_paragraph()
-            start_num = len(objective_qs) + idx if objective_qs else idx
-            q_run = qp.add_run(f"ຂໍ້ {start_num}. {q['question_text']}")
+            q_run = qp.add_run(f"ຂໍ້ {idx}. {q['question_text']}")
             q_run.bold = True
             
             for _ in range(3):
@@ -476,7 +594,9 @@ async def upload_source(
     file: UploadFile = File(...),
     page_start: str = Form(None),
     page_end: str = Form(None),
-    force_ocr: str = Form(None)
+    force_ocr: str = Form(None),
+    exclude_pages: str = Form(None),
+    api_key: str = Form(None)
 ):
     user_id = get_current_user(request)
     if not user_id:
@@ -496,9 +616,23 @@ async def upload_source(
         p_end = int(page_end) if page_end and page_end.strip() != "" else None
         force_ocr_bool = force_ocr == 'true' or force_ocr == '1'
         
+        p_exclude_set = set()
+        if exclude_pages and exclude_pages.strip():
+            for part in exclude_pages.split(","):
+                try:
+                    p_exclude_set.add(int(part.strip()))
+                except ValueError:
+                    pass
+                    
         extracted_text = None
         if filename_lower.endswith('.pdf'):
-            extracted_text = extract_text_from_pdf(file_stream, page_start=p_start, page_end=p_end, force_ocr=force_ocr_bool)
+            extracted_text = extract_text_from_pdf(
+                file_stream, 
+                page_start=p_start, 
+                page_end=p_end, 
+                force_ocr=force_ocr_bool, 
+                exclude_pages=p_exclude_set
+            )
         elif filename_lower.endswith('.docx'):
             extracted_text = extract_text_from_docx(file_stream)
         else:
@@ -507,12 +641,16 @@ async def upload_source(
         if not extracted_text:
             return JSONResponse(status_code=400, content={"error": "ບໍ່ສາມາດອ່ານຂໍ້ຄວາມຈາກໄຟລ໌ໄດ້ ຫຼື ໄຟລ໌ຫວ່າງເປົ່າ"})
             
+        metadata = gemini_helper.analyze_document_metadata(extracted_text, api_key=api_key)
+
         source_id = database.add_source(file.filename, file_size, extracted_text, user_id)
         return {
             "id": source_id,
             "filename": file.filename,
             "file_size": file_size,
-            "message": "ອັບໂຫລດ ແລະ ວິເຄາະບົດຮຽນສຳເລັດ"
+            "message": "ອັບໂຫລດ ແລະ ວິເຄາະບົດຮຽນສຳເລັດ",
+            "subject": metadata.get("subject", "ບົດຮຽນທົ່ວໄປ"),
+            "grade": metadata.get("grade", "ມ.7")
         }
     except Exception as e:
         print(f"Upload error: {e}")
@@ -633,11 +771,23 @@ async def generate_test(request: Request):
         else:
             source_ids = [data['source_id']]
 
-    num_questions = int(data.get('num_questions', 10))
-    difficulty = data.get('difficulty', 'medium')
     question_type = data.get('question_type', 'multiple_choice')
     custom_instructions = data.get('custom_instructions', '')
     num_options = int(data.get('num_options', 4))
+    
+    num_objective = data.get('num_objective')
+    num_subjective = data.get('num_subjective')
+    if num_objective is not None:
+        num_objective = int(num_objective)
+    if num_subjective is not None:
+        num_subjective = int(num_subjective)
+
+    if question_type == 'mixed' and num_objective is not None and num_subjective is not None:
+        num_questions = num_objective + num_subjective
+    else:
+        num_questions = int(data.get('num_questions', 10))
+
+    difficulty = data.get('difficulty', 'medium')
     
     system_prompt_name = data.get('system_prompt', 'default')
     if system_prompt_name and system_prompt_name != 'default':
@@ -661,6 +811,9 @@ async def generate_test(request: Request):
     if data.get('api_key'):
         api_keys['gemini'] = data.get('api_key')
         
+    if not database.is_user_within_token_limit(user_id):
+        return JSONResponse(status_code=400, content={"error": "ທ່ານໄດ້ໃຊ້ໂທເຄັນເກີນກຳນົດແລ້ວ (Token limit exceeded)"})
+
     try:
         combined_text = ""
         valid_source_ids = []
@@ -682,8 +835,12 @@ async def generate_test(request: Request):
             custom_instructions=custom_instructions,
             num_options=num_options,
             language=language,
-            api_keys=api_keys
+            api_keys=api_keys,
+            num_objective=num_objective,
+            num_subjective=num_subjective
         )
+        
+        database.increment_token_usage(user_id, token_count)
         
         if shuffle_options and question_type in ['multiple_choice', 'mixed']:
             import random
@@ -817,7 +974,24 @@ async def export_docx(request: Request, test_id: int):
         if not test:
             return JSONResponse(status_code=404, content={"error": "ບໍ່ພົບການສອບເສັງນີ້"})
             
-        docx_stream = generate_docx_file(test)
+        school = request.query_params.get("school")
+        subject = request.query_params.get("subject")
+        motto = request.query_params.get("motto")
+        grade = request.query_params.get("grade")
+        watermark = request.query_params.get("watermark")
+        exam_no = request.query_params.get("exam_no")
+        time_limit = request.query_params.get("time_limit")
+
+        docx_stream = generate_docx_file(
+            test,
+            school=school,
+            subject=subject,
+            motto=motto,
+            grade=grade,
+            watermark=watermark,
+            exam_no=exam_no,
+            time_limit=time_limit
+        )
         filename = f"test_{test_id}.docx"
         
         headers = {
@@ -850,6 +1024,9 @@ async def chat_with_source(request: Request):
     if data.get('api_key'):
         api_keys['gemini'] = data.get('api_key')
         
+    if not database.is_user_within_token_limit(user_id):
+        return JSONResponse(status_code=400, content={"error": "ທ່ານໄດ້ໃຊ້ໂທເຄັນເກີນກຳນົດແລ້ວ (Token limit exceeded)"})
+
     try:
         source = database.get_source(source_id, user_id)
         if not source:
@@ -862,6 +1039,7 @@ async def chat_with_source(request: Request):
             context_text=source['text_content'],
             api_keys=api_keys
         )
+        database.increment_token_usage(user_id, token_count)
         return {"response": response_text}
     except ValueError as ve:
         return JSONResponse(status_code=400, content={"error": str(ve)})
