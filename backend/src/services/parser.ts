@@ -544,3 +544,8 @@ export async function generateDocxFile(params: {
 
   return await Packer.toBuffer(doc);
 }
+
+export async function getPdfPageCount(pdfBuffer: Buffer): Promise<number> {
+  const parsed = await pdf(pdfBuffer);
+  return parsed.numpages || 0;
+}

@@ -4,6 +4,9 @@ import json
 import sqlite3
 import datetime
 
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from llm_helper import generate_test_questions
 import database

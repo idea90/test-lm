@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "5000:5000"
+    volumes:
+      - test-lm-data:/app/database_data
+      - test-lm-uploads:/app/uploads
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-your-secure-production-key}
+      - FRONTEND_URL=http://localhost:3000
+      - DATABASE_DIR=/app/database_data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./next-app
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - BACKEND_URL=http://backend:5000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  test-lm-data:
+  test-lm-uploads:

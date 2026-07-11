@@ -14,7 +14,17 @@ import gemini_helper
 
 load_dotenv()
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:3000")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.add_middleware(
     SessionMiddleware, 
@@ -24,8 +34,16 @@ app.add_middleware(
 # Initialize SQLite database
 database.init_db()
 
-POPPLER_PATH = os.getenv("POPPLER_PATH") or r"C:\Users\idea\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
-pytesseract.pytesseract.tesseract_cmd = os.getenv("TESSERACT_CMD") or r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+POPPLER_PATH = os.getenv("POPPLER_PATH")
+if not POPPLER_PATH and os.name == 'nt':
+    POPPLER_PATH = r"C:\Users\idea\AppData\Local\Microsoft\WinGet\Packages\oschwartz10612.Poppler_Microsoft.Winget.Source_8wekyb3d8bbwe\poppler-25.07.0\Library\bin"
+
+TESSERACT_CMD = os.getenv("TESSERACT_CMD")
+if not TESSERACT_CMD and os.name == 'nt':
+    TESSERACT_CMD = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+
+if TESSERACT_CMD:
+    pytesseract.pytesseract.tesseract_cmd = TESSERACT_CMD
 
 UPLOAD_AVATAR_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads', 'avatars')
 os.makedirs(UPLOAD_AVATAR_FOLDER, exist_ok=True)

@@ -271,6 +271,25 @@ app.get('/api/sources', async (req, res) => {
   return res.json(list);
 });
 
+app.post('/api/sources/upload/info', upload.single('file'), async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const filenameLower = req.file.originalname.toLowerCase();
+  if (!filenameLower.endsWith('.pdf')) {
+    return res.json({ total_pages: 0, is_pdf: false });
+  }
+
+  try {
+    const totalPages = await parser.getPdfPageCount(req.file.buffer);
+    return res.json({ total_pages: totalPages, is_pdf: true });
+  } catch (err: any) {
+    console.error("Error reading PDF info:", err);
+    return res.status(500).json({ error: `ເກີດຂໍ້ຜິດພາດໃນການອ່ານໄຟລ໌: ${err.message}` });
+  }
+});
+
 app.post('/api/sources/upload', upload.single('file'), async (req, res) => {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -691,7 +710,7 @@ app.post('/api/chat', async (req, res) => {
       for (const sid of source_ids) {
         const source = await db.getSource(sid, userId);
         if (source) {
-          combinedText += `--- ຂໍ້ມູນຈາກໄຟລ໌: {source.filename} ---\n${source.text_content}\n\n`;
+          combinedText += `--- ຂໍ້ມູນຈາກໄຟລ໌: ${source.filename} ---\n${source.text_content}\n\n`;
         }
       }
     }

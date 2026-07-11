@@ -1,7 +1,8 @@
 import sqlite3
 import os
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'test_lm.db')
+DB_DIR = os.getenv("DATABASE_DIR", os.path.dirname(__file__))
+DATABASE_PATH = os.path.join(DB_DIR, 'test_lm.db')
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_PATH, timeout=20.0)

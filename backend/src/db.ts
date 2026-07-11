@@ -11,6 +11,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Failed to open database:', err.message);
   } else {
     db.run("PRAGMA journal_mode = WAL");
+    db.run("PRAGMA busy_timeout = 20000");
   }
 });
 
