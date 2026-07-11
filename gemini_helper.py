@@ -196,7 +196,10 @@ def generate_test_questions(context_text, num_questions, difficulty_lao, questio
     except Exception as e:
         # Fallback if parsing fails (highly unlikely with Structured Outputs)
         print(f"Error parsing Gemini response: {e}")
-        print(response.text)
+        try:
+            print(response.text)
+        except Exception:
+            pass
         raise ValueError("Gemini ຕອບສະໜອງໃນຮູບແບບທີ່ບໍ່ຖືກຕ້ອງ. ກະລຸນາລອງໃໝ່.")
 
 def generate_chat_response(chat_history, new_message, context_text, api_key=None, model_name='gemini-2.5-flash'):

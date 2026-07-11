@@ -336,15 +336,15 @@ def generate_docx_file(test_data, school=None, subject=None, motto=None, grade=N
     key_title_run.font.size = Pt(14)
     doc.add_paragraph()
     
-    for i, q in enumerate(test_data['questions'], 1):
-        kp = doc.add_paragraph()
-        is_subjective = (q['option_a'] == '' and q['option_b'] == '' and q['option_c'] == '' and q['option_d'] == '')
+    if objective_qs:
+        sec1_kp = doc.add_paragraph()
+        sec1_k_run = sec1_kp.add_run("I. ພາກປາລະໄນ (ຄຳຖາມເລືອກຕອບ)")
+        sec1_k_run.bold = True
+        sec1_k_run.font.size = Pt(13)
+        doc.add_paragraph()
         
-        if is_subjective:
-            k_run1 = kp.add_run(f"ຂໍ້ {i}. ແນວທາງຄຳຕອບ: ")
-            k_run2 = kp.add_run(q.get('explanation') or 'ບໍ່ມີແນວທາງຄຳຕອບ')
-            k_run2.bold = True
-        else:
+        for i, q in enumerate(objective_qs, 1):
+            kp = doc.add_paragraph()
             correct_lao = lao_options.get(q['correct_option'].upper(), q['correct_option'])
             k_run1 = kp.add_run(f"ຂໍ້ {i}. ຕອບ: ")
             k_run2 = kp.add_run(f"{correct_lao}")
@@ -358,8 +358,21 @@ def generate_docx_file(test_data, school=None, subject=None, motto=None, grade=N
             k_run3 = kp.add_run(f"ອະທິບາຍ: {explanation_text}")
             k_run3.font.size = Pt(10.5)
             k_run3.italic = True
-        
+            doc.add_paragraph()
+
+    if subjective_qs:
+        sec2_kp = doc.add_paragraph()
+        sec2_k_run = sec2_kp.add_run("II. ພາກອັດຕະໄນ (ຄຳຖາມອະທິບາຍ/ຕອບສັ້ນ)")
+        sec2_k_run.bold = True
+        sec2_k_run.font.size = Pt(13)
         doc.add_paragraph()
+        
+        for i, q in enumerate(subjective_qs, 1):
+            kp = doc.add_paragraph()
+            k_run1 = kp.add_run(f"ຂໍ້ {i}. ແນວທາງຄຳຕອບ: ")
+            k_run2 = kp.add_run(q.get('explanation') or 'ບໍ່ມີແນວທາງຄຳຕອບ')
+            k_run2.bold = True
+            doc.add_paragraph()
         
     docx_stream = io.BytesIO()
     doc.save(docx_stream)

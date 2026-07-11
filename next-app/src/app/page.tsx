@@ -85,6 +85,8 @@ const MODELS = [
   { id: 'claude-haiku-4.5', name: 'Claude 4.5 Haiku', provider: 'anthropic', price: 'cheap', desc: 'ໄວ ແລະ ປະຢັດ ຂອງ Anthropic', badge: 'Claude' },
   { id: 'claude-sonnet-4.6', name: 'Claude 4.6 Sonnet', provider: 'anthropic', price: 'expensive', desc: 'ໃຫມ່! ປະສິດທິພາບດີເລີດ & ເຮັດວຽກເປັນລະບົບ', badge: 'Claude' },
   { id: 'claude-opus-4.8', name: 'Claude Opus 4.8', provider: 'anthropic', price: 'expensive', desc: 'ໃຫມ່! ໂມເດວຄິດຫາເຫດຜົນລະດັບສູງ', badge: 'Claude' },
+  // ─── Local/Mock ───
+  { id: 'mock-model', name: 'Mock/Test Model', provider: 'local', price: 'cheap', desc: 'ບໍ່ເສຍຄ່າ! ສຳລັບທົດສອບລະບົບເທົ່ານັ້ນ', badge: 'Free' },
 ];
 
 function ModelSelect({ value, onChange }) {
@@ -941,7 +943,7 @@ export default function App() {
                     )}
                     <button className="icon-btn" onClick={deleteTest} title="ລົບບົດສອບເສັງ" style={{ color: 'var(--md-error)' }}><I name="trash" size={16} /></button>
 
-                    {!activeTest.rich_text_content && activeTest?.questions?.some(q => q.question_type !== 'multiple_choice') && (
+                    {!activeTest.rich_text_content && activeTest?.questions?.some(q => !q.option_a && !q.option_b && !q.option_c && !q.option_d) && (
                       <button className="toolbar-chip" onClick={() => setDottedLines(p => p === 0 ? 3 : p === 3 ? 5 : 0)}>
                         ເສັ້ນຂຽນ: {dottedLines === 0 ? 'ປິດ' : `${dottedLines} ແຖວ`}
                       </button>

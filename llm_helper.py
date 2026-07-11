@@ -22,6 +22,24 @@ def generate_test_questions(model_name, context_text, num_questions, difficulty_
         data, token_count = _generate_openai(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('openai'), num_objective, num_subjective)
     elif model_name.startswith('claude'):
         data, token_count = _generate_anthropic(model_name, context_text, num_questions, difficulty_lao, question_type, custom_instructions, num_options, language, api_keys.get('anthropic'), num_objective, num_subjective)
+    elif model_name == 'mock-model':
+        import time
+        time.sleep(1)
+        data = {
+            "title": "ບົດສອບເສັງທົດສອບ (Mock Test)",
+            "questions": []
+        }
+        for i in range(num_questions):
+            data["questions"].append({
+                "question_text": f"ຄຳຖາມທົດສອບຂໍ້ທີ {i+1} (Mock Question)",
+                "option_a": "ຕົວເລືອກ ກ",
+                "option_b": "ຕົວເລືອກ ຂ",
+                "option_c": "ຕົວເລືອກ ຄ",
+                "option_d": "ຕົວເລືອກ ງ",
+                "correct_option": "A",
+                "explanation": "ນີ້ຄືຄຳອະທິບາຍທົດສອບ (Mock Explanation)"
+            })
+        token_count = 50
     else:
         raise ValueError(f"ບໍ່ຮອງຮັບໂມເດວ: {model_name}")
 
@@ -78,6 +96,10 @@ def generate_chat_response(model_name, chat_history, new_message, context_text, 
         return _chat_openai(model_name, chat_history, new_message, context_text, api_keys.get('openai'))
     elif model_name.startswith('claude'):
         return _chat_anthropic(model_name, chat_history, new_message, context_text, api_keys.get('anthropic'))
+    elif model_name == 'mock-model':
+        import time
+        time.sleep(1)
+        return "ນີ້ຄືການຕອບກັບແບບທົດສອບ (Mock Chat Response) ເພື່ອບໍ່ໃຫ້ເສຍຄ່າ API.", 50
     else:
         raise ValueError(f"ບໍ່ຮອງຮັບໂມເດວ: {model_name}")
 
