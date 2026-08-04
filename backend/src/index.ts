@@ -27,15 +27,19 @@ await db.initDb();
 
 // Middleware
 app.use(cors({
-  origin: true, // Allow all origins for dev
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const sessionSecret = process.env.SECRET_KEY || crypto.randomBytes(32).toString('hex');
+if (!process.env.SECRET_KEY) {
+  console.warn('WARNING: SECRET_KEY not set in .env. Using random key — sessions will not persist across restarts.');
+}
 app.use(cookieSession({
   name: 'session',
-  keys: [process.env.SECRET_KEY || 'test-lm-default-secret-key-123456'],
+  keys: [sessionSecret],
   maxAge: 24 * 60 * 60 * 1000 // 24 hours
 }));
 
@@ -100,7 +104,8 @@ function verifyWerkzeugHash(password: string, passwordHash: string): boolean {
   try {
     return bcrypt.compareSync(password, passwordHash);
   } catch (e) {
-    return password === passwordHash;
+    console.error('Password verification error:', e);
+    return false;
   }
 }
 
@@ -238,10 +243,20 @@ app.get('/api/auth/me', async (req, res) => {
   }
 });
 
+app.get('/api/models', (req, res) => {
+  const models = llm.getAvailableModels();
+  return res.json(models);
+});
+
 app.post('/api/user/profile-pic', upload.single('file'), async (req, res) => {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  if (!allowedMimes.includes(req.file.mimetype)) {
+    return res.status(400).json({ error: "ຮອງຮັບສະເພາະໄຟລ໌ຮູບພາບ (JPEG, PNG, GIF, WebP) ເທົ່ານັ້ນ" });
+  }
 
   const ext = path.extname(req.file.originalname) || '.png';
   const filename = `${userId}_avatar${ext}`;
@@ -251,6 +266,33 @@ app.post('/api/user/profile-pic', upload.single('file'), async (req, res) => {
   await db.updateUserProfilePic(userId, filename);
 
   return res.json({ message: "ອັບເດດຮູບໂປຣຟາຍສຳເລັດ", profile_pic: `/uploads/avatars/${filename}` });
+});
+
+app.get('/api/user/api-keys', async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const keys = await db.getUserApiKeys(userId);
+  const maskKey = (k: string) => k ? (k.length > 8 ? `${k.substring(0, 6)}...${k.substring(k.length - 3)}` : '******') : '';
+
+  return res.json({
+    has_gemini: !!keys.gemini,
+    masked_gemini: maskKey(keys.gemini),
+    has_openai: !!keys.openai,
+    masked_openai: maskKey(keys.openai),
+    has_anthropic: !!keys.anthropic,
+    masked_anthropic: maskKey(keys.anthropic)
+  });
+});
+
+app.post('/api/user/api-keys', async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { gemini, openai, anthropic } = req.body;
+  await db.updateUserApiKeys(userId, { gemini, openai, anthropic });
+
+  return res.json({ message: "ບັນທຶກ API Key ໃສ່ບັນຊີສຳເລັດ" });
 });
 
 app.delete('/api/user/account', async (req, res) => {
@@ -311,7 +353,8 @@ app.post('/api/sources/upload', upload.single('file'), async (req, res) => {
     : [];
 
   const forceOcr = req.body.force_ocr === 'true' || req.query.force_ocr === 'true' || false;
-  const apiKey = req.body.api_key || req.query.api_key;
+  const dbKeys = await db.getUserApiKeys(userId);
+  const apiKey = req.body.api_key || req.query.api_key || dbKeys.gemini;
 
   const filename = req.file.originalname;
   const fileSize = req.file.size;
@@ -498,15 +541,25 @@ app.post('/api/tests/generate', async (req, res) => {
   let instructionsMerged = custom_instructions;
   const systemPromptName = req.body.system_prompt;
   if (systemPromptName && systemPromptName !== 'default') {
-    const promptPath = path.join(rootDir, 'system-prompt-lao', `${systemPromptName}.txt`);
-    if (fs.existsSync(promptPath)) {
-      const sysContent = fs.readFileSync(promptPath, 'utf-8');
-      instructionsMerged = instructionsMerged ? `${sysContent}\n\nUser Custom Instructions:\n${instructionsMerged}` : sysContent;
+    // Sanitize: allow only alphanumeric, hyphens, underscores
+    const safeName = systemPromptName.replace(/[^a-zA-Z0-9_\-]/g, '');
+    if (safeName) {
+      const promptPath = path.join(rootDir, 'system-prompt-lao', `${safeName}.txt`);
+      // Verify resolved path is within the expected directory
+      const promptsDir = path.join(rootDir, 'system-prompt-lao');
+      if (path.resolve(promptPath).startsWith(path.resolve(promptsDir)) && fs.existsSync(promptPath)) {
+        const sysContent = fs.readFileSync(promptPath, 'utf-8');
+        instructionsMerged = instructionsMerged ? `${sysContent}\n\nUser Custom Instructions:\n${instructionsMerged}` : sysContent;
+      }
     }
   }
 
-  const apiKeys: Record<string, string> = req.body.api_keys || {};
-  if (api_key) apiKeys.gemini = api_key;
+  const dbKeys = await db.getUserApiKeys(userId);
+  const apiKeys: Record<string, string> = {
+    gemini: (req.body.api_keys && req.body.api_keys.gemini) || api_key || dbKeys.gemini,
+    openai: (req.body.api_keys && req.body.api_keys.openai) || dbKeys.openai,
+    anthropic: (req.body.api_keys && req.body.api_keys.anthropic) || dbKeys.anthropic
+  };
 
   try {
     let combinedText = "";
@@ -550,9 +603,8 @@ app.post('/api/tests/generate', async (req, res) => {
           { k: 'D', v: q.option_d || '' }
         ];
         const correctKey = q.correct_option;
-        const correctText = options.find(o => o.k === correctKey)?.v || '';
         
-        // Shuffle
+        // Shuffle (Fisher-Yates)
         for (let i = options.length - 1; i > 0; i--) {
           const j = Math.floor(Math.random() * (i + 1));
           [options[i], options[j]] = [options[j], options[i]];
@@ -563,8 +615,8 @@ app.post('/api/tests/generate', async (req, res) => {
         q.option_c = options[2].v;
         q.option_d = options[3].v;
 
-        // Find new correct option letter
-        const newCorrectIdx = options.findIndex(o => o.v === correctText);
+        // Find new position of the originally correct option by its original key
+        const newCorrectIdx = options.findIndex(o => o.k === correctKey);
         q.correct_option = ['A', 'B', 'C', 'D'][newCorrectIdx !== -1 ? newCorrectIdx : 0];
       }
     }
@@ -599,7 +651,7 @@ app.put('/api/questions/:question_id', async (req, res) => {
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
   const qId = parseInt(req.params.question_id);
-  const { question_text, option_a, option_b, option_c, option_d, correct_option, explanation } = req.body;
+  const { question_text, option_a, option_b, option_c, option_d, correct_option, explanation, question_type, answer_text, points } = req.body;
 
   const success = await db.updateQuestion(
     qId,
@@ -610,7 +662,10 @@ app.put('/api/questions/:question_id', async (req, res) => {
     option_d || '',
     correct_option || 'A',
     explanation || '',
-    userId
+    userId,
+    question_type,
+    answer_text,
+    points
   );
 
   if (success) {
@@ -631,7 +686,7 @@ app.post('/api/questions', async (req, res) => {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  const { test_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation } = req.body;
+  const { test_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, question_type, answer_text, points } = req.body;
   const qId = await db.addQuestion(
     parseInt(test_id),
     question_text,
@@ -641,7 +696,10 @@ app.post('/api/questions', async (req, res) => {
     option_d || '',
     correct_option || 'A',
     explanation || '',
-    userId
+    userId,
+    question_type,
+    answer_text,
+    points
   );
 
   if (qId !== null) {

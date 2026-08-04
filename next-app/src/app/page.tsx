@@ -457,11 +457,34 @@ export default function App() {
     setDialog({ type: 'confirm', title, message, onConfirm });
   };
 
-  const showPrompt = (message, placeholder, onConfirm, title = 'ປ້ອນຂໍ້ມູນ') => {
-    setDialog({ type: 'prompt', title, message, placeholder, value: '', onConfirm, onChange: (v) => setDialog(d => ({ ...d, value: v })) });
+  const [sessionApiKeys, setSessionApiKeys] = useState({ gemini: '', openai: '', anthropic: '' });
+
+  useEffect(() => {
+    localStorage.removeItem('gemini_api_key');
+    localStorage.removeItem('openai_api_key');
+    localStorage.removeItem('anthropic_api_key');
+    checkAuth();
+  }, []);
+
+  const loadUserApiKeys = async () => {
+    try {
+      const r = await api.get('/api/user/api-keys');
+      const d = await r.json();
+      if (r.ok) {
+        setSessionApiKeys({
+          gemini: d.masked_gemini || '',
+          openai: d.masked_openai || '',
+          anthropic: d.masked_anthropic || ''
+        });
+      }
+    } catch {}
   };
 
-  useEffect(() => { checkAuth(); }, []);
+  useEffect(() => {
+    if (settingsOpen && user) {
+      loadUserApiKeys();
+    }
+  }, [settingsOpen, user]);
 
   // ─── Auth ───
   const checkAuth = async () => {
@@ -589,8 +612,7 @@ export default function App() {
     if (forceOcr) fd.append('force_ocr', 'true');
     if (excludePages) fd.append('exclude_pages', excludePages);
     
-    const key = localStorage.getItem('gemini_api_key') || '';
-    if (key) fd.append('api_key', key);
+    if (sessionApiKeys.gemini) fd.append('api_key', sessionApiKeys.gemini);
 
     try {
       const r = await api.postForm('/api/sources/upload', fd);
@@ -631,9 +653,9 @@ export default function App() {
     
     setGenLoading(true); setConfigOpen(false);
     try {
-      const key = localStorage.getItem('gemini_api_key') || '';
-      const openai_key = localStorage.getItem('openai_api_key') || '';
-      const anthropic_key = localStorage.getItem('anthropic_api_key') || '';
+      const key = sessionApiKeys.gemini || '';
+      const openai_key = sessionApiKeys.openai || '';
+      const anthropic_key = sessionApiKeys.anthropic || '';
       const r = await api.post('/api/tests/generate', {
         source_id: selSrcIds[0],
         source_ids: selSrcIds,
@@ -1436,21 +1458,58 @@ export default function App() {
 
               {/* API Keys Section */}
               <div style={{ borderTop: '1px solid var(--md-outline-variant)', paddingTop: 20 }}>
-                <h4 style={{ marginBottom: 12, color: 'var(--md-primary)', fontSize: 16 }}>ລະຫັດ API ຂອງ AI</h4>
-                <div className="md-field"><label>ລະຫັດ API ຂອງ Gemini</label><input className="md-input" type="password" id="api-key-in" placeholder="AIzaSy..." defaultValue={localStorage.getItem('gemini_api_key') || ''} /></div>
-                <div className="md-field" style={{marginTop: 10}}><label>ລະຫັດ API ຂອງ OpenAI</label><input className="md-input" type="password" id="openai-key-in" placeholder="sk-..." defaultValue={localStorage.getItem('openai_api_key') || ''} /></div>
-                <div className="md-field" style={{marginTop: 10}}><label>ລະຫັດ API ຂອງ Anthropic</label><input className="md-input" type="password" id="anthropic-key-in" placeholder="sk-ant-..." defaultValue={localStorage.getItem('anthropic_api_key') || ''} /></div>
-                <p style={{ fontSize: 13, color: 'var(--md-outline)', marginTop: 10 }}>ໃສ່ Key ຂອງທ່ານ ຖ້າເຊີບເວີບໍ່ໄດ້ຕັ້ງ .env</p>
+                <h4 style={{ marginBottom: 12, color: 'var(--md-primary)', fontSize: 16 }}>🔑 ລະຫັດ API Keys (ບັນທຶກໃນ Database)</h4>
+                <div className="md-field">
+                  <label>ລະຫັດ API ຂອງ Gemini</label>
+                  <input
+                    className="md-input"
+                    type="password"
+                    id="api-key-in"
+                    placeholder="AIzaSy..."
+                    value={sessionApiKeys.gemini}
+                    onChange={e => setSessionApiKeys(p => ({ ...p, gemini: e.target.value.trim() }))}
+                  />
+                </div>
+                <div className="md-field" style={{marginTop: 10}}>
+                  <label>ລະຫັດ API ຂອງ OpenAI</label>
+                  <input
+                    className="md-input"
+                    type="password"
+                    id="openai-key-in"
+                    placeholder="sk-..."
+                    value={sessionApiKeys.openai}
+                    onChange={e => setSessionApiKeys(p => ({ ...p, openai: e.target.value.trim() }))}
+                  />
+                </div>
+                <div className="md-field" style={{marginTop: 10}}>
+                  <label>ລະຫັດ API ຂອງ Anthropic</label>
+                  <input
+                    className="md-input"
+                    type="password"
+                    id="anthropic-key-in"
+                    placeholder="sk-ant-..."
+                    value={sessionApiKeys.anthropic}
+                    onChange={e => setSessionApiKeys(p => ({ ...p, anthropic: e.target.value.trim() }))}
+                  />
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--md-outline)', marginTop: 10 }}>ກົດ "ບັນທຶກ" ເພື່ອເກັບ API Key ໄວ້ໃນບັນຊີ Database ຂອງທ່ານຢ່າງປອດໄພ (ບໍ່ຜ່ານ LocalStorage)</p>
               </div>
 
             </div>
             <div className="dialog-actions" style={{ padding: '8px 24px 24px' }}>
               <button className="md-btn-text" onClick={() => setSettingsOpen(false)}>ປິດ</button>
-              <button className="md-btn-filled" onClick={() => { 
-                localStorage.setItem('gemini_api_key', (document.getElementById('api-key-in') as HTMLInputElement).value.trim()); 
-                localStorage.setItem('openai_api_key', (document.getElementById('openai-key-in') as HTMLInputElement).value.trim()); 
-                localStorage.setItem('anthropic_api_key', (document.getElementById('anthropic-key-in') as HTMLInputElement).value.trim()); 
-                setSettingsOpen(false); show('ບັນທຶກແລ້ວ'); 
+              <button className="md-btn-filled" onClick={async () => { 
+                try {
+                  await api.post('/api/user/api-keys', {
+                    gemini: sessionApiKeys.gemini.includes('...') ? undefined : sessionApiKeys.gemini,
+                    openai: sessionApiKeys.openai.includes('...') ? undefined : sessionApiKeys.openai,
+                    anthropic: sessionApiKeys.anthropic.includes('...') ? undefined : sessionApiKeys.anthropic
+                  });
+                  show('ບັນທຶກ API Key ໃສ່ບັນຊີສຳເລັດ');
+                  setSettingsOpen(false);
+                } catch {
+                  showAlert('ເກີດຂໍ້ຜິດພາດໃນການບັນທຶກ API Key');
+                }
               }} style={{ width: 'auto', padding: '10px 24px', borderRadius: 'var(--shape-full)' }}>ບັນທຶກ</button>
             </div>
           </div>

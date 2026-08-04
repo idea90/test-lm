@@ -12,6 +12,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
   } else {
     db.run("PRAGMA journal_mode = WAL");
     db.run("PRAGMA busy_timeout = 20000");
+    db.run("PRAGMA foreign_keys = ON");
   }
 });
 
@@ -92,12 +93,16 @@ export async function initDb(): Promise<void> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       test_id INTEGER NOT NULL,
       question_text TEXT NOT NULL,
+      question_type TEXT DEFAULT 'multiple_choice',
       option_a TEXT NOT NULL,
       option_b TEXT NOT NULL,
       option_c TEXT NOT NULL,
       option_d TEXT NOT NULL,
       correct_option TEXT NOT NULL,
+      answer_text TEXT,
       explanation TEXT,
+      points INTEGER DEFAULT 1,
+      order_index INTEGER DEFAULT 0,
       FOREIGN KEY(test_id) REFERENCES tests(id) ON DELETE CASCADE
     )
   `);
@@ -129,6 +134,30 @@ export async function initDb(): Promise<void> {
     }
     if (!userColNames.includes('profile_pic')) {
       await run("ALTER TABLE users ADD COLUMN profile_pic TEXT");
+    }
+    if (!userColNames.includes('gemini_api_key')) {
+      await run("ALTER TABLE users ADD COLUMN gemini_api_key TEXT");
+    }
+    if (!userColNames.includes('openai_api_key')) {
+      await run("ALTER TABLE users ADD COLUMN openai_api_key TEXT");
+    }
+    if (!userColNames.includes('anthropic_api_key')) {
+      await run("ALTER TABLE users ADD COLUMN anthropic_api_key TEXT");
+    }
+
+    const qCols = await query("PRAGMA table_info(questions)");
+    const qColNames = qCols.map((c) => c.name);
+    if (!qColNames.includes('question_type')) {
+      await run("ALTER TABLE questions ADD COLUMN question_type TEXT DEFAULT 'multiple_choice'");
+    }
+    if (!qColNames.includes('answer_text')) {
+      await run("ALTER TABLE questions ADD COLUMN answer_text TEXT");
+    }
+    if (!qColNames.includes('points')) {
+      await run("ALTER TABLE questions ADD COLUMN points INTEGER DEFAULT 1");
+    }
+    if (!qColNames.includes('order_index')) {
+      await run("ALTER TABLE questions ADD COLUMN order_index INTEGER DEFAULT 0");
     }
   } catch (err) {
     console.error("Migration error:", err);
@@ -172,7 +201,38 @@ export async function updateUserProfilePic(userId: number, profilePic: string): 
   await run("UPDATE users SET profile_pic = ? WHERE id = ?", [profilePic, userId]);
 }
 
+export async function updateUserApiKeys(
+  userId: number,
+  keys: { gemini?: string; openai?: string; anthropic?: string }
+): Promise<void> {
+  const current = await get("SELECT gemini_api_key, openai_api_key, anthropic_api_key FROM users WHERE id = ?", [userId]) || {};
+  const gemini = keys.gemini !== undefined ? keys.gemini : (current.gemini_api_key || '');
+  const openai = keys.openai !== undefined ? keys.openai : (current.openai_api_key || '');
+  const anthropic = keys.anthropic !== undefined ? keys.anthropic : (current.anthropic_api_key || '');
+  
+  await run(
+    "UPDATE users SET gemini_api_key = ?, openai_api_key = ?, anthropic_api_key = ? WHERE id = ?",
+    [gemini, openai, anthropic, userId]
+  );
+}
+
+export async function getUserApiKeys(userId: number): Promise<{ gemini: string; openai: string; anthropic: string }> {
+  const row = await get("SELECT gemini_api_key, openai_api_key, anthropic_api_key FROM users WHERE id = ?", [userId]);
+  return {
+    gemini: row ? (row.gemini_api_key || '') : '',
+    openai: row ? (row.openai_api_key || '') : '',
+    anthropic: row ? (row.anthropic_api_key || '') : ''
+  };
+}
+
 export async function deleteUserAccount(userId: number): Promise<void> {
+  // Manually cascade: delete questions -> tests -> sources -> user
+  const testRows = await query("SELECT id FROM tests WHERE user_id = ?", [userId]);
+  for (const t of testRows) {
+    await run("DELETE FROM questions WHERE test_id = ?", [t.id]);
+  }
+  await run("DELETE FROM tests WHERE user_id = ?", [userId]);
+  await run("DELETE FROM sources WHERE user_id = ?", [userId]);
   await run("DELETE FROM users WHERE id = ?", [userId]);
 }
 
@@ -241,20 +301,26 @@ export async function createTest(
   );
   const testId = result.lastID;
 
-  // Insert questions
-  for (const q of questions) {
+  // Insert questions with full type and attributes
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    const qType = q.question_type || (q.option_a || q.option_b ? 'multiple_choice' : 'essay');
     await run(
-      `INSERT INTO questions (test_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO questions (test_id, question_text, question_type, option_a, option_b, option_c, option_d, correct_option, answer_text, explanation, points, order_index)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         testId,
-        q.question_text,
+        q.question_text || '',
+        qType,
         q.option_a || '',
         q.option_b || '',
         q.option_c || '',
         q.option_d || '',
         q.correct_option || 'A',
-        q.explanation || ''
+        q.answer_text || (qType === 'essay' || qType === 'short_answer' ? q.explanation || '' : ''),
+        q.explanation || '',
+        q.points !== undefined ? q.points : 1,
+        q.order_index !== undefined ? q.order_index : i
       ]
     );
   }
@@ -281,7 +347,7 @@ export async function getTest(testId: number, userId: number): Promise<any | nul
 
   if (!testRow) return null;
 
-  const questions = await query("SELECT * FROM questions WHERE test_id = ?", [testId]);
+  const questions = await query("SELECT * FROM questions WHERE test_id = ? ORDER BY order_index ASC, id ASC", [testId]);
   return {
     ...testRow,
     questions
@@ -315,7 +381,10 @@ export async function updateQuestion(
   optD: string,
   correctOpt: string,
   explanation: string,
-  userId?: number
+  userId?: number,
+  questionType?: string,
+  answerText?: string,
+  points?: number
 ): Promise<boolean> {
   if (userId) {
     const verify = await get(`
@@ -326,11 +395,14 @@ export async function updateQuestion(
     if (!verify) return false;
   }
 
+  const qType = questionType || (optA || optB ? 'multiple_choice' : 'essay');
+  const pts = points !== undefined ? points : 1;
+
   await run(`
     UPDATE questions 
-    SET question_text = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, correct_option = ?, explanation = ?
+    SET question_text = ?, question_type = ?, option_a = ?, option_b = ?, option_c = ?, option_d = ?, correct_option = ?, answer_text = ?, explanation = ?, points = ?
     WHERE id = ?
-  `, [qText, optA, optB, optC, optD, correctOpt, explanation, questionId]);
+  `, [qText, qType, optA, optB, optC, optD, correctOpt, answerText || '', explanation, pts, questionId]);
   return true;
 }
 
@@ -366,23 +438,30 @@ export async function addQuestion(
   optD: string,
   correctOpt: string,
   explanation: string,
-  userId?: number
+  userId?: number,
+  questionType?: string,
+  answerText?: string,
+  points?: number
 ): Promise<number | null> {
   if (userId) {
     const verify = await get("SELECT id FROM tests WHERE id = ? AND user_id = ?", [testId, userId]);
     if (!verify) return null;
   }
 
+  const qType = questionType || (optA || optB ? 'multiple_choice' : 'essay');
+  const pts = points !== undefined ? points : 1;
+
+  const countRow = await get("SELECT COUNT(*) as count FROM questions WHERE test_id = ?", [testId]);
+  const orderIdx = countRow ? countRow.count : 0;
+
   const result = await run(`
-    INSERT INTO questions (test_id, question_text, option_a, option_b, option_c, option_d, correct_option, explanation)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `, [testId, qText, optA, optB, optC, optD, correctOpt, explanation]);
+    INSERT INTO questions (test_id, question_text, question_type, option_a, option_b, option_c, option_d, correct_option, answer_text, explanation, points, order_index)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [testId, qText, qType, optA, optB, optC, optD, correctOpt, answerText || '', explanation, pts, orderIdx]);
   const qId = result.lastID;
 
   // Update question count in test
-  const countRow = await get("SELECT COUNT(*) as count FROM questions WHERE test_id = ?", [testId]);
-  const newCount = countRow ? countRow.count : 0;
-  await run("UPDATE tests SET num_questions = ? WHERE id = ?", [newCount, testId]);
+  await run("UPDATE tests SET num_questions = ? WHERE id = ?", [orderIdx + 1, testId]);
 
   return qId;
 }

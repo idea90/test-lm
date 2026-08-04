@@ -81,14 +81,18 @@ export async function extractTextFromPdf(
   forceOcr = false
 ): Promise<string> {
   const excludeSet = new Set(excludePages);
-  const hasPageConstraints = pageStart > 1 || pageEnd !== null || excludePages.length > 0;
 
-  // If not forced and has no page constraints, try pdf-parse first
-  if (!forceOcr && !hasPageConstraints) {
+  // If not forced, try pdf-parse with page range filtering in Node.js first
+  if (!forceOcr) {
     try {
-      let pagesText: string[] = [];
+      let currentPageNum = 0;
       const options = {
         pagerender: function (pageData: any) {
+          currentPageNum++;
+          if (currentPageNum < pageStart) return '';
+          if (pageEnd !== null && currentPageNum > pageEnd) return '';
+          if (excludeSet.has(currentPageNum)) return '';
+
           return pageData.getTextContent().then(function (textContent: any) {
             let lastY: any, text = '';
             for (let item of textContent.items) {
@@ -105,27 +109,34 @@ export async function extractTextFromPdf(
       };
 
       const parsed = await pdf(pdfBuffer, options);
-      
-      // pdf-parse doesn't easily split page text, but we can hook into text content
-      // If we got sufficient text, return it
       const text = parsed.text || '';
       if (text.trim().length >= 15) {
-        // Since pdf-parse output is combined, we return it. 
-        // Note: For advanced pagination/exclusion, we rely on the python helper.
         return text.trim();
       }
     } catch (err: any) {
-      console.warn("pdf-parse failed, falling back to python OCR:", err.message);
+      console.warn("pdf-parse failed or returned minimal text, falling back to python OCR:", err.message);
     }
   }
 
-  // Fallback / Forced OCR: Write PDF to temp file and run python helper
-  const tempPdfPath = path.join(rootDir, `temp_upload_${Date.now()}.pdf`);
+  // Fallback / Forced OCR: Write PDF to temp file in uploads/temp and run python helper
+  const tempDir = path.join(rootDir, 'uploads', 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+  const tempPdfPath = path.join(tempDir, `temp_upload_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.pdf`);
   await fs.promises.writeFile(tempPdfPath, pdfBuffer);
 
   try {
-    const pythonPath = path.resolve(rootDir, 'venv/Scripts/python.exe');
-    const helperScript = path.resolve(__dirname, 'pdf_ocr.py');
+    const pythonPath = process.env.PYTHON_PATH || (process.platform === 'win32'
+      ? (fs.existsSync(path.resolve(rootDir, 'venv/Scripts/python.exe')) 
+          ? path.resolve(rootDir, 'venv/Scripts/python.exe')
+          : 'python')
+      : (fs.existsSync(path.resolve(rootDir, 'venv/bin/python'))
+          ? path.resolve(rootDir, 'venv/bin/python')
+          : 'python3'));
+
+    // pdf_ocr.py lives in backend/src/services/, not in dist/services/
+    const helperScript = path.resolve(rootDir, 'backend', 'src', 'services', 'pdf_ocr.py');
     const excludePagesStr = excludePages.length > 0 ? excludePages.join(',') : 'none';
     const pageEndStr = pageEnd !== null ? String(pageEnd) : 'none';
     const forceOcrStr = forceOcr ? '1' : '0';
@@ -138,7 +149,7 @@ export async function extractTextFromPdf(
       pageEndStr,
       excludePagesStr,
       forceOcrStr
-    ], { maxBuffer: 1024 * 1024 * 10 }); // 10MB buffer
+    ], { maxBuffer: 1024 * 1024 * 25 }); // 25MB buffer
 
     return stdout.trim();
   } catch (err: any) {
@@ -475,7 +486,7 @@ export async function generateDocxFile(params: {
   }
 
   // Page Break for Answer Key
-  docChildren.push(new PageBreak());
+  docChildren.push(new Paragraph({ children: [new PageBreak()] }));
 
   docChildren.push(
     new Paragraph({

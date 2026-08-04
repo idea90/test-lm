@@ -51,8 +51,8 @@ function cleanJsonString(text: string): string {
 
 function getGeminiClient(apiKey?: string) {
   const key = apiKey || process.env.GEMINI_API_KEY;
-  if (!key) {
-    throw new Error("ບໍ່ພົບ API Key ຂອງ Gemini. ກະລຸນາຕັ້ງຄ່າ API Key ໃນສ່ວນການຕັ້ງຄ່າ.");
+  if (!key || key === 'your_gemini_api_key_here') {
+    throw new Error("ບໍ່ພົບ GEMINI_API_KEY ຢູ່ Server (.env). ກະລຸນາຕັ້ງຄ່າ GEMINI_API_KEY ໃນໄຟລ໌ .env ຂອງ Server.");
   }
   return new GoogleGenAI({ apiKey: key });
 }
@@ -155,31 +155,120 @@ function buildPrompt(
   `;
 }
 
-function enforceQuestionFormat(data: any, questionType: string, numObjective?: number): any {
-  const questions = data.questions || [];
-  if (questions.length === 0) return data;
-
-  let toBlank: any[] = [];
-  if (questionType === 'short_answer') {
-    toBlank = questions;
-  } else if (questionType === 'mixed') {
-    if (numObjective !== undefined) {
-      toBlank = questions.slice(numObjective);
-    } else {
-      const midpoint = Math.floor(questions.length / 2);
-      toBlank = questions.slice(midpoint);
+export function getAvailableModels() {
+  return [
+    {
+      id: 'gemini-2.5-flash',
+      name: 'Gemini 2.5 Flash (ແນະນຳ - ໄວ & ແມ່ນຍຳ)',
+      provider: 'google',
+      available: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
+    },
+    {
+      id: 'gemini-2.5-pro',
+      name: 'Gemini 2.5 Pro (ສຳລັບຄຳຖາມຊັບຊ້ອນ)',
+      provider: 'google',
+      available: !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_gemini_api_key_here'
+    },
+    {
+      id: 'gpt-4o',
+      name: 'GPT-4o (OpenAI)',
+      provider: 'openai',
+      available: !!process.env.OPENAI_API_KEY
+    },
+    {
+      id: 'gpt-4o-mini',
+      name: 'GPT-4o Mini (OpenAI)',
+      provider: 'openai',
+      available: !!process.env.OPENAI_API_KEY
+    },
+    {
+      id: 'claude-3-5-sonnet-20241022',
+      name: 'Claude 3.5 Sonnet (Anthropic)',
+      provider: 'anthropic',
+      available: !!process.env.ANTHROPIC_API_KEY
     }
+  ];
+}
+
+export function validateAndSanitizeQuestions(data: any, defaultType = 'multiple_choice', numObjective?: number): any {
+  if (!data || typeof data !== 'object') {
+    data = {};
+  }
+  
+  if (!data.title || typeof data.title !== 'string') {
+    data.title = "ຫົວບົດສອບເສັງ";
   }
 
-  for (const q of toBlank) {
-    q.option_a = "";
-    q.option_b = "";
-    q.option_c = "";
-    q.option_d = "";
-    q.correct_option = "A";
+  let questions = Array.isArray(data.questions) ? data.questions : [];
+  if (questions.length === 0) {
+    throw new Error("AI ບໍ່ສາມາດສ້າງຄຳຖາມໄດ້ ຫຼື ຮູບແບບຂໍ້ມູນບໍ່ຖືກຕ້ອງ.");
   }
 
+  const sanitizedQuestions = [];
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i] || {};
+    
+    // Ensure question_text exists
+    const questionText = (q.question_text || q.question || `ຄຳຖາມ ຂໍ້ທີ ${i + 1}`).trim();
+    
+    // Determine question type
+    let qType = q.question_type || defaultType;
+    if (defaultType === 'short_answer' || defaultType === 'essay') {
+      qType = defaultType;
+    } else if (defaultType === 'mixed' && numObjective !== undefined) {
+      qType = i < numObjective ? 'multiple_choice' : 'essay';
+    } else if (!['multiple_choice', 'true_false', 'short_answer', 'essay'].includes(qType)) {
+      qType = (q.option_a || q.option_b) ? 'multiple_choice' : 'essay';
+    }
+
+    let optionA = (q.option_a || '').trim();
+    let optionB = (q.option_b || '').trim();
+    let optionC = (q.option_c || '').trim();
+    let optionD = (q.option_d || '').trim();
+    let correctOpt = (q.correct_option || 'A').toUpperCase().trim();
+    if (!['A', 'B', 'C', 'D'].includes(correctOpt)) {
+      correctOpt = 'A';
+    }
+
+    const explanation = (q.explanation || q.answer_text || '').trim();
+    let answerText = (q.answer_text || '').trim();
+
+    if (qType === 'essay' || qType === 'short_answer') {
+      optionA = '';
+      optionB = '';
+      optionC = '';
+      optionD = '';
+      correctOpt = 'A';
+      if (!answerText) {
+        answerText = explanation || 'ຄຳຕອບແບບອັດຕະນັຍ';
+      }
+    } else {
+      // Multiple choice fallback
+      if (!optionA) optionA = 'ຕົວເລືອກ A';
+      if (!optionB) optionB = 'ຕົວເລືອກ B';
+    }
+
+    sanitizedQuestions.push({
+      question_text: questionText,
+      question_type: qType,
+      option_a: optionA,
+      option_b: optionB,
+      option_c: optionC,
+      option_d: optionD,
+      correct_option: correctOpt,
+      answer_text: answerText,
+      explanation: explanation,
+      points: Number(q.points) || 1,
+      order_index: i
+    });
+  }
+
+  data.questions = sanitizedQuestions;
   return data;
+}
+
+function enforceQuestionFormat(data: any, questionType: string, numObjective?: number): any {
+  return validateAndSanitizeQuestions(data, questionType, numObjective);
 }
 
 export async function generateTestQuestions(params: {
@@ -296,7 +385,7 @@ export async function generateTestQuestions(params: {
     const systemPrompt = "You are a curriculum designer. You must output ONLY a valid JSON object matching the requested schema. No markdown wrappers, no introductory text.";
     const response = await anthropic.messages.create({
       model: modelName,
-      max_tokens: 4096,
+      max_tokens: 8192,
       system: systemPrompt,
       messages: [{ role: 'user', content: prompt + "\nOutput raw JSON conforming to {\"title\":\"...\",\"questions\":[{\"question_text\":\"...\",\"option_a\":\"...\",\"option_b\":\"...\",\"option_c\":\"...\",\"option_d\":\"...\",\"correct_option\":\"A/B/C/D\",\"explanation\":\"...\"}]}" }],
       temperature: 0.3
@@ -307,6 +396,27 @@ export async function generateTestQuestions(params: {
     data = enforceQuestionFormat(data, questionType, numObjective);
     const tokenCount = response.usage.input_tokens + response.usage.output_tokens;
     return { data, tokenCount };
+  } else if (modelName === 'mock-model') {
+    // Mock model for testing — returns sample questions without calling any API
+    const mockQuestions = [];
+    for (let i = 0; i < numQuestions; i++) {
+      const isSubj = (questionType === 'short_answer') ||
+        (questionType === 'mixed' && numObjective !== undefined && i >= numObjective);
+      mockQuestions.push({
+        question_text: `ຄຳຖາມທົດສອບ ຂໍ້ ${i + 1} (Mock)`,
+        option_a: isSubj ? '' : `ຕົວເລືອກ ກ ຂໍ້ ${i + 1}`,
+        option_b: isSubj ? '' : `ຕົວເລືອກ ຂ ຂໍ້ ${i + 1}`,
+        option_c: isSubj ? '' : `ຕົວເລືອກ ຄ ຂໍ້ ${i + 1}`,
+        option_d: isSubj ? '' : `ຕົວເລືອກ ງ ຂໍ້ ${i + 1}`,
+        correct_option: 'A',
+        explanation: isSubj ? `ແນວທາງຄຳຕອບ ຂໍ້ ${i + 1} (Mock)` : `ຄຳອະທິບາຍ ຂໍ້ ${i + 1} (Mock)`
+      });
+    }
+    const data = enforceQuestionFormat({
+      title: `ບົດສອບເສັງທົດສອບ (Mock) - ${numQuestions} ຂໍ້`,
+      questions: mockQuestions
+    }, questionType, numObjective);
+    return { data, tokenCount: 0 };
   } else {
     throw new Error(`ບໍ່ຮອງຮັບໂມເດວ: ${modelName}`);
   }
