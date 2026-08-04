@@ -10,6 +10,7 @@
     "@composio/core": "^0.12.0",
     "autoskill": "^0.1.0",
     "concurrently": "^10.0.3",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "next": "^16.0.0"
   }
 }
