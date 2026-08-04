@@ -1,0 +1,6 @@
+{
+  "version": 2,
+  "buildCommand": "npm --prefix next-app run build",
+  "outputDirectory": "next-app/.next",
+  "framework": "nextjs"
+}
