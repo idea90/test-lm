@@ -80,6 +80,9 @@ def main():
     with open(pdf_path, 'rb') as f:
         pdf_bytes = f.read()
 
+    import logging
+    logger = logging.getLogger("pypdf")
+    logger.setLevel(logging.ERROR)
     reader = pypdf.PdfReader(pdf_path)
     total_pages = len(reader.pages)
 
